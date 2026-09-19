@@ -55,6 +55,18 @@ function Main() {
     setSourceIndex(i => (i + 1) % SOURCES.length);
   };
 
+  // Lista de reproducción: la propia lista de fuentes, en orden.
+  const hasPrevious = sourceIndex > 0;
+  const hasNext = sourceIndex < SOURCES.length - 1;
+  const goPrevious = () => {
+    setError(null);
+    setSourceIndex(i => Math.max(0, i - 1));
+  };
+  const goNext = () => {
+    setError(null);
+    setSourceIndex(i => Math.min(SOURCES.length - 1, i + 1));
+  };
+
   return (
     <SafeAreaView
       style={styles.container}
@@ -70,13 +82,18 @@ function Main() {
         onError={setError}
         onFullscreenChange={setFullscreen}
         onPipChange={setPip}
+        hasPrevious={hasPrevious}
+        hasNext={hasNext}
+        onPrevious={goPrevious}
+        onNext={goNext}
       />
 
       <View style={styles.info} pointerEvents={fullscreen || pip ? 'none' : 'auto'}>
         <Text style={styles.heading}>{current.title}</Text>
         <Text style={styles.hint}>
           Tap: mostrar/ocultar controles · Doble tap en los lados: ±10 s ·
-          Arrastra la barra roja para buscar
+          Arrastra la barra roja para buscar · ⏮ ⏭ cambian de vídeo (
+          {sourceIndex + 1}/{SOURCES.length})
         </Text>
         <Pressable
           onPress={switchSource}

@@ -48,12 +48,13 @@ propio (sin fuentes de iconos ni módulos nativos extra para los controles):
 |---|---|
 | Tap en el vídeo | Muestra/oculta los controles (se ocultan solos a los 3 s) |
 | Doble tap izquierda/derecha | −10 s / +10 s; taps seguidos acumulan (20 s, 30 s…) |
-| Botones centrales | ⟲10 · Play/Pause/Replay · ⟳10 |
+| Botones centrales | ⏮ · ⟲10 · Play/Pause/Replay · ⟳10 · ⏭ (⏮/⏭ cuando hay lista, también en directo; en VOD ⏮ reinicia si llevas > 3 s, como YouTube) |
+| Fin del vídeo | Autoplay del siguiente de la lista (`autoplayNext`, por defecto `true`); sin siguiente, icono de Replay |
 | Barra roja inferior | Arrastrable (scrubbing) con buffer en gris; mini barra cuando los controles están ocultos |
 | ⚙ (arriba derecha) | Menú: **Calidad** (Auto + alturas disponibles, p. ej. 1080p/720p/480p, vía `onVideoTracks` + `selectedVideoTrack`; en iOS 15+ es un tope de resolución) y **Velocidad** 0.5x – 2x |
 | ⛶ (abajo derecha) | Pantalla completa: rota a horizontal, botón atrás sale |
 | Spinner | Mientras hace buffering |
-| ▭ (abajo derecha) | Picture in Picture manual; también entra solo al salir de la app (`enterPictureInPictureOnLeave`) |
+| ▭ (arriba derecha, junto a ⚙) | Picture in Picture manual; también entra solo al salir de la app (`enterPictureInPictureOnLeave`) |
 
 ### Directos (live)
 
@@ -62,7 +63,7 @@ en la librería (`../video_player`):
 
 | Situación | UI |
 |---|---|
-| Cualquier directo | Sin botones ±10 s ni doble tap |
+| Cualquier directo | Sin botones ±10 s ni doble tap; ⏮/⏭ sí (lista con varios canales) |
 | En directo (`liveOffset` ≤ 5 s) | Badge rojo **● EN VIVO**, sin tiempos |
 | Atrasado | Badge gris + `-m:ss` de retraso; tap en el badge = volver al directo |
 | Con ventana DVR (≥ 30 s) | Barra arrastrable sobre la ventana; soltar cerca del final = volver al directo |

@@ -35,6 +35,7 @@ import {
   ReplayIcon,
   SettingsIcon,
   SkipIcon,
+  TrackIcon,
 } from './icons';
 
 const SKIP_SECONDS = 10;
@@ -62,7 +63,17 @@ type Props = {
   onFullscreenChange?: (fullscreen: boolean) => void;
   /** Se llama al entrar/salir de Picture in Picture. */
   onPipChange?: (active: boolean) => void;
+  /** Lista de reproducción: botones ⏮/⏭ (solo en VOD) y autoplay del siguiente al terminar. */
+  onNext?: () => void;
+  onPrevious?: () => void;
+  hasNext?: boolean;
+  hasPrevious?: boolean;
+  /** Reproducir el siguiente automáticamente al terminar (por defecto true). */
+  autoplayNext?: boolean;
 };
+
+// ⏮ con más de este tiempo reproducido vuelve al inicio en vez de al anterior (como YouTube).
+const PREVIOUS_RESTART_THRESHOLD_S = 3;
 
 export function formatTime(seconds: number) {
   const total = Math.max(0, Math.floor(seconds));
@@ -80,6 +91,11 @@ export default function VideoPlayer({
   onError,
   onFullscreenChange,
   onPipChange,
+  onNext,
+  onPrevious,
+  hasNext = false,
+  hasPrevious = false,
+  autoplayNext = true,
 }: Props) {
   const videoRef = useRef<VideoRef>(null);
   const insets = useSafeAreaInsets();
@@ -406,10 +422,26 @@ export default function VideoPlayer({
   const onBuffer = (data: OnBufferData) => setBuffering(data.isBuffering);
 
   const onEnd = () => {
+    if (autoplayNext && hasNext && onNext) {
+      onNext();
+      return;
+    }
     setEnded(true);
     setPaused(true);
     setCurrentTime(duration);
     showControls();
+  };
+
+  // ⏮: en VOD reinicia si ya llevamos unos segundos; si no (o en directo), va al anterior.
+  const goPrevious = () => {
+    const restart = !isLive && (currentTime > PREVIOUS_RESTART_THRESHOLD_S || !hasPrevious);
+    if (restart || !onPrevious) {
+      seekTo(0);
+      setPaused(false);
+    } else if (hasPrevious) {
+      onPrevious();
+    }
+    touch();
   };
 
   const displayTime = scrubbing ? scrubTime : currentTime;
@@ -430,6 +462,9 @@ export default function VideoPlayer({
   const hasDvr = !isLive || seekableDuration >= MIN_DVR_WINDOW_S;
   // En directo no hay saltos de ±10 s (ni botones ni doble tap).
   const canSkip = !isLive;
+  // Botones de pista anterior/siguiente cuando hay lista (también en directo: una
+  // lista puede tener varios canales en vivo).
+  const showTrackButtons = !!onNext || !!onPrevious;
   const atLiveEdge = isLive && liveOffset >= 0 && liveOffset <= LIVE_EDGE_TOLERANCE_S;
   // Posición live del reproductor dentro de la ventana DVR.
   const livePosition = liveOffset >= 0 ? currentTime + liveOffset : seekableDuration;
@@ -568,21 +603,46 @@ export default function VideoPlayer({
             <Text style={styles.title} numberOfLines={1}>
               {title ?? ''}
             </Text>
-            <Pressable
-              hitSlop={12}
-              style={styles.iconButton}
-              onPress={() => {
-                setMenu('main');
-                touch();
-              }}>
-              <SettingsIcon />
-            </Pressable>
+            <View style={styles.topRight} pointerEvents="box-none">
+              <Pressable
+                hitSlop={12}
+                style={styles.iconButton}
+                onPress={() => {
+                  videoRef.current?.enterPictureInPicture();
+                  touch();
+                }}>
+                <PipIcon />
+              </Pressable>
+              <Pressable
+                hitSlop={12}
+                style={styles.iconButton}
+                onPress={() => {
+                  setMenu('main');
+                  touch();
+                }}>
+                <SettingsIcon />
+              </Pressable>
+            </View>
           </View>
 
           {/* Controles centrales. La fila siempre se renderiza (flex: 1 empuja la
               barra inferior al fondo); solo el botón de play se oculta mientras
               hace buffering, porque el spinner ocupa su sitio. */}
           <View style={styles.centerRow} pointerEvents="box-none">
+            {showTrackButtons && (
+              <Pressable
+                hitSlop={12}
+                style={[
+                  styles.iconButton,
+                  !hasPrevious &&
+                    (isLive || currentTime <= PREVIOUS_RESTART_THRESHOLD_S) &&
+                    styles.dimmed,
+                ]}
+                disabled={isLive && !hasPrevious}
+                onPress={goPrevious}>
+                <TrackIcon direction="previous" />
+              </Pressable>
+            )}
             <Pressable
               hitSlop={12}
               style={[styles.iconButton, !canSkip && styles.hidden]}
@@ -610,6 +670,18 @@ export default function VideoPlayer({
               onPress={() => skip('right', false)}>
               <SkipIcon direction="forward" seconds={SKIP_SECONDS} />
             </Pressable>
+            {showTrackButtons && (
+              <Pressable
+                hitSlop={12}
+                style={[styles.iconButton, !hasNext && styles.dimmed]}
+                disabled={!hasNext}
+                onPress={() => {
+                  onNext?.();
+                  touch();
+                }}>
+                <TrackIcon direction="next" />
+              </Pressable>
+            )}
           </View>
 
           {/* Barra inferior */}
@@ -636,26 +708,15 @@ export default function VideoPlayer({
                   <Text style={styles.timeDim}> / {formatTime(duration)}</Text>
                 </Text>
               )}
-              <View style={styles.bottomRight} pointerEvents="box-none">
-                <Pressable
-                  hitSlop={12}
-                  style={styles.iconButton}
-                  onPress={() => {
-                    videoRef.current?.enterPictureInPicture();
-                    touch();
-                  }}>
-                  <PipIcon />
-                </Pressable>
-                <Pressable
-                  hitSlop={12}
-                  style={styles.iconButton}
-                  onPress={() => {
-                    setFullscreen(f => !f);
-                    touch();
-                  }}>
-                  <FullscreenIcon exit={fullscreen} />
-                </Pressable>
-              </View>
+              <Pressable
+                hitSlop={12}
+                style={styles.iconButton}
+                onPress={() => {
+                  setFullscreen(f => !f);
+                  touch();
+                }}>
+                <FullscreenIcon exit={fullscreen} />
+              </Pressable>
             </View>
             {hasDvr ? (
               <SeekBar
@@ -841,7 +902,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 48,
+    gap: 28,
   },
   iconButton: {
     padding: 6,
@@ -932,7 +993,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  bottomRight: {
+  topRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,

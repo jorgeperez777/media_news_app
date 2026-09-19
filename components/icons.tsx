@@ -102,6 +102,33 @@ export function FullscreenIcon({size = 22, exit = false}: {size?: number; exit?:
   );
 }
 
+export function TrackIcon({direction, size = 28}: {direction: 'previous' | 'next'; size?: number}) {
+  // ⏮ / ⏭ : barra + triángulo, como los botones de pista de YouTube.
+  const bar = <View style={{width: size * 0.12, height: size * 0.7, backgroundColor: WHITE, borderRadius: 1}} />;
+  const triangle = (
+    <View
+      style={{
+        width: 0,
+        height: 0,
+        borderTopWidth: size * 0.35,
+        borderBottomWidth: size * 0.35,
+        borderTopColor: 'transparent',
+        borderBottomColor: 'transparent',
+        ...(direction === 'next'
+          ? {borderLeftWidth: size * 0.6, borderLeftColor: WHITE}
+          : {borderRightWidth: size * 0.6, borderRightColor: WHITE}),
+      }}
+    />
+  );
+  return (
+    <View style={{flexDirection: 'row', alignItems: 'center', gap: size * 0.08}}>
+      {direction === 'previous' ? bar : null}
+      {triangle}
+      {direction === 'next' ? bar : null}
+    </View>
+  );
+}
+
 export function PipIcon({size = 22}: {size?: number}) {
   // Rectángulo grande con uno pequeño en la esquina inferior derecha (icono PiP clásico).
   return (
