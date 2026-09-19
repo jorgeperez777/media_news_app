@@ -1,0 +1,5 @@
+# asdf (https://asdf-vm.com). Versiones con las que se construye y prueba la app.
+# Java: en macOS también sirve `brew install openjdk@17` (es lo que usa esta máquina).
+nodejs 22.23.2
+ruby 4.0.6
+java temurin-17.0.20+8
