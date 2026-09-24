@@ -180,6 +180,33 @@ export function AirPlayGlyph({size = 48, color = WHITE}: {size?: number; color?:
   );
 }
 
+export function ChevronIcon({
+  direction = 'down',
+  size = 22,
+}: {
+  direction?: 'down' | 'up';
+  size?: number;
+}) {
+  // Punta de flecha dibujada con dos bordes de un cuadrado girado 45°.
+  return (
+    <View style={{width: size, height: size, alignItems: 'center', justifyContent: 'center'}}>
+      <View
+        style={{
+          width: size * 0.55,
+          height: size * 0.55,
+          borderRightWidth: 2.5,
+          borderBottomWidth: 2.5,
+          borderColor: WHITE,
+          transform: [
+            {rotate: direction === 'down' ? '45deg' : '-135deg'},
+            {translateY: direction === 'down' ? -size * 0.1 : 0},
+          ],
+        }}
+      />
+    </View>
+  );
+}
+
 export function CloseIcon({size = 22}: {size?: number}) {
   const bar = {
     position: 'absolute' as const,

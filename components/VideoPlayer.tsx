@@ -34,6 +34,7 @@ import useCast from './useCast';
 import {
   AirPlayGlyph,
   CastIcon,
+  ChevronIcon,
   FullscreenIcon,
   StopIcon,
   PipIcon,
@@ -70,6 +71,11 @@ type Props = {
   onFullscreenChange?: (fullscreen: boolean) => void;
   /** Se llama al entrar/salir de Picture in Picture. */
   onPipChange?: (active: boolean) => void;
+  /**
+   * Si se pasa, aparece el chevron ⌄ a la izquierda del título (como en YouTube)
+   * para mandar el reproductor al miniplayer.
+   */
+  onMinimize?: () => void;
   /** Lista de reproducción: botones ⏮/⏭ (solo en VOD) y autoplay del siguiente al terminar. */
   onNext?: () => void;
   onPrevious?: () => void;
@@ -110,6 +116,7 @@ export default function VideoPlayer({
   onError,
   onFullscreenChange,
   onPipChange,
+  onMinimize,
   onNext,
   onPrevious,
   hasNext = false,
@@ -751,6 +758,18 @@ export default function VideoPlayer({
 
           {/* Barra superior */}
           <View style={styles.topBar} pointerEvents="box-none">
+            {/* ⌄ minimizar: solo cuando hay miniplayer y no estamos en pantalla completa. */}
+            {onMinimize && !fullscreen && (
+              <Pressable
+                hitSlop={12}
+                style={styles.iconButton}
+                onPress={() => {
+                  onMinimize();
+                  touch();
+                }}>
+                <ChevronIcon direction="down" />
+              </Pressable>
+            )}
             <Text style={styles.title} numberOfLines={1}>
               {title ?? ''}
             </Text>
@@ -1110,7 +1129,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
-    marginRight: 12,
+    marginHorizontal: 8,
   },
   castDeviceRow: {
     flexDirection: 'row',

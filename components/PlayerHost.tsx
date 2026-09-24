@@ -156,6 +156,7 @@ export default function PlayerHost() {
           onPausedChange={player.setPaused}
           onError={player.setError}
           onFullscreenChange={player.setFullscreen}
+          onMinimize={player.minimize}
           onPipChange={player.setPip}
           hasPrevious={player.hasPrevious}
           hasNext={player.hasNext}

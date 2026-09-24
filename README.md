@@ -58,6 +58,7 @@ se anima es su geometría entre dos cajas:
 | | Expandido | Miniplayer |
 |---|---|---|
 | Geometría | El hueco que reserva `DetailScreen` (lo mide y lo publica en el contexto) | Barra de 72 px abajo, con el vídeo a la izquierda |
+| Minimizar | ⌄ a la izquierda del título (prop `onMinimize` de `VideoPlayer`), arrastre o botón Atrás | — |
 | Controles | Los de siempre (`VideoPlayer`) | `compact`: sin overlay; la barra pone título, ⏯ y ✕ |
 | Gestos | Arrastrar hacia abajo minimiza | Tocar expande · arrastrar hacia abajo cierra |
 
@@ -82,6 +83,7 @@ propio (sin fuentes de iconos ni módulos nativos extra para los controles):
 
 | Gesto / control | Comportamiento |
 |---|---|
+| ⌄ (arriba izquierda, junto al título) | Manda el vídeo al miniplayer (solo si el contenedor pasa `onMinimize`) |
 | Tap en el vídeo | Muestra/oculta los controles (se ocultan solos a los 3 s) |
 | Doble tap izquierda/derecha | −10 s / +10 s; taps seguidos acumulan (20 s, 30 s…) |
 | Botones centrales | ⏮ · ⟲10 · Play/Pause/Replay · ⟳10 · ⏭ (⏮/⏭ cuando hay lista, también en directo; en VOD ⏮ reinicia si llevas > 3 s, como YouTube) |
