@@ -6,6 +6,8 @@ buildscript {
         targetSdkVersion = 35
         ndkVersion = "27.1.12297006"
         kotlinVersion = "2.0.21"
+        // Chromecast (react-native-google-cast usa "+" si no se fija)
+        castFrameworkVersion = "21.5.0"
     }
     repositories {
         google()

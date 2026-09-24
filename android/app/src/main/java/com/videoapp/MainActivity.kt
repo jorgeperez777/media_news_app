@@ -1,9 +1,11 @@
 package com.videoapp
 
+import android.os.Bundle
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
+import com.reactnative.googlecast.api.RNGCCastContext
 
 class MainActivity : ReactActivity() {
 
@@ -12,6 +14,13 @@ class MainActivity : ReactActivity() {
    * rendering of the component.
    */
   override fun getMainComponentName(): String = "VideoApp"
+
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    // Inicializa el contexto de Chromecast al arrancar: sin esto el descubrimiento de
+    // dispositivos no empieza hasta que algo toca el SDK y el botón de cast no aparece.
+    RNGCCastContext.getSharedInstance(this)
+  }
 
   /**
    * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]

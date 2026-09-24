@@ -13,9 +13,11 @@ import {
   type ViewStyle,
 } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
+import {CastButton} from 'react-native-google-cast';
 import Orientation from 'react-native-orientation-locker';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Video, {
+  AirPlayButton,
   SelectedVideoTrackType,
   type OnBufferData,
   type OnLoadData,
@@ -27,7 +29,9 @@ import Video, {
   type VideoTrack,
 } from 'react-native-video';
 import SeekBar from './SeekBar';
+import useCast from './useCast';
 import {
+  CastIcon,
   FullscreenIcon,
   PipIcon,
   PauseIcon,
@@ -139,6 +143,8 @@ export default function VideoPlayer({
   const resumeToLiveRef = useRef(false);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Última posición local conocida, para arrancar el Chromecast donde íbamos.
+  const currentTimeRef = useRef(0);
   const surfaceWidth = useRef(1);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -204,6 +210,30 @@ export default function VideoPlayer({
     });
     return unsubscribe;
   }, []);
+
+  // Chromecast: al conectar un dispositivo, el vídeo pasa al receptor y la
+  // reproducción local se pausa; al desconectar, se reanuda donde iba el receptor.
+  const sourceUri =
+    typeof source === 'object' && source !== null && 'uri' in source
+      ? (source as {uri?: string}).uri
+      : undefined;
+  const cast = useCast({
+    media: {url: sourceUri, title, isLive, duration},
+    getLocalTime: () => currentTimeRef.current,
+    onCastStart: () => {
+      setPaused(true);
+      setMenu(null);
+      setControlsVisible(true);
+    },
+    onCastEnd: position => {
+      if (!isLive && position > 0) {
+        videoRef.current?.seek(position);
+        setCurrentTime(position);
+      }
+      setPaused(false);
+    },
+  });
+  const casting = cast.casting;
 
   const retry = useCallback(() => {
     if (retryTimer.current) {
@@ -273,13 +303,17 @@ export default function VideoPlayer({
     (time: number) => {
       const max = isLive ? seekableDuration : duration;
       const clamped = Math.max(0, Math.min(max || 0, time));
+      if (casting) {
+        cast.seek(clamped);
+        return;
+      }
       videoRef.current?.seek(clamped);
       setCurrentTime(clamped);
       if (ended && clamped < duration) {
         setEnded(false);
       }
     },
-    [duration, ended, isLive, seekableDuration],
+    [cast, casting, duration, ended, isLive, seekableDuration],
   );
 
   // Vuelve a la posición live del reproductor (currentTime + liveOffset) y reanuda.
@@ -294,6 +328,15 @@ export default function VideoPlayer({
   }, [currentTime, liveOffset, seekableDuration, touch]);
 
   const togglePlay = useCallback(() => {
+    if (casting) {
+      if (cast.paused) {
+        cast.play();
+      } else {
+        cast.pause();
+      }
+      touch();
+      return;
+    }
     if (ended) {
       seekTo(0);
       setEnded(false);
@@ -302,7 +345,7 @@ export default function VideoPlayer({
       setPaused(p => !p);
     }
     touch();
-  }, [ended, seekTo, touch]);
+  }, [cast, casting, ended, seekTo, touch]);
 
   // showHint: el indicador lateral solo se muestra con el gesto de doble tap.
   const skip = useCallback(
@@ -315,7 +358,8 @@ export default function VideoPlayer({
       const seconds = (chained ? lastSkip.current!.seconds : 0) + SKIP_SECONDS;
       lastSkip.current = {time: now, side, seconds};
 
-      seekTo(currentTime + (side === 'left' ? -SKIP_SECONDS : SKIP_SECONDS));
+      const from = casting ? cast.position : currentTime;
+      seekTo(from + (side === 'left' ? -SKIP_SECONDS : SKIP_SECONDS));
       if (showHint) {
         setSkipHint({side, seconds});
         if (skipHintTimer.current) {
@@ -325,7 +369,7 @@ export default function VideoPlayer({
       }
       touch();
     },
-    [currentTime, seekTo, touch],
+    [cast, casting, currentTime, seekTo, touch],
   );
 
   // Tap sencillo: mostrar/ocultar. Doble tap en un lado: saltar ±10 s.
@@ -408,6 +452,7 @@ export default function VideoPlayer({
   const onVideoTracks = (data: OnVideoTracksData) => setVideoTracks(data.videoTracks);
 
   const onProgress = (data: OnProgressData) => {
+    currentTimeRef.current = data.currentTime;
     if (!scrubbing) {
       setCurrentTime(data.currentTime);
     }
@@ -444,7 +489,14 @@ export default function VideoPlayer({
     touch();
   };
 
-  const displayTime = scrubbing ? scrubTime : currentTime;
+  // Mientras se transmite, los tiempos y el estado de reproducción vienen del receptor.
+  const displayTime = scrubbing
+    ? scrubTime
+    : casting
+    ? cast.position
+    : currentTime;
+  const uiPaused = casting ? cast.paused : paused;
+  const uiBuffering = casting ? cast.buffering : buffering;
 
   // Alturas únicas disponibles (1080, 720, …) de mayor a menor.
   const qualityOptions = Array.from(
@@ -458,8 +510,15 @@ export default function VideoPlayer({
   const speedLabel = (r: number) => (r === 1 ? 'Normal' : `${r}x`);
 
   // En directo la barra representa la ventana DVR (seekableDuration), no una duración fija.
-  const timelineDuration = isLive ? seekableDuration : duration;
-  const hasDvr = !isLive || seekableDuration >= MIN_DVR_WINDOW_S;
+  // Transmitiendo, la duración la da el receptor (en directo no hay DVR remoto).
+  const timelineDuration = casting
+    ? cast.duration || duration
+    : isLive
+    ? seekableDuration
+    : duration;
+  const hasDvr = casting
+    ? !isLive && timelineDuration > 0
+    : !isLive || seekableDuration >= MIN_DVR_WINDOW_S;
   // En directo no hay saltos de ±10 s (ni botones ni doble tap).
   const canSkip = !isLive;
   // Botones de pista anterior/siguiente cuando hay lista (también en directo: una
@@ -532,6 +591,21 @@ export default function VideoPlayer({
       {/* Superficie táctil: tap / doble tap */}
       <Pressable style={StyleSheet.absoluteFill} onPress={onSurfacePress} />
 
+      {/* Transmitiendo: el vídeo se ve en el Chromecast, aquí queda el estado */}
+      {casting && (
+        <View pointerEvents="none" style={styles.castOverlay}>
+          <CastIcon size={56} />
+          <Text style={styles.castTitle} numberOfLines={1}>
+            {title ?? ''}
+          </Text>
+          <Text style={styles.castDevice} numberOfLines={1}>
+            {cast.loadError
+              ? `No se pudo transmitir: ${cast.loadError}`
+              : `Transmitiendo a ${cast.deviceName}`}
+          </Text>
+        </View>
+      )}
+
       {/* Indicador de salto (±10 s) */}
       {skipHint && (
         <View
@@ -548,7 +622,7 @@ export default function VideoPlayer({
       )}
 
       {/* Spinner de carga */}
-      {buffering && !scrubbing && !playerError && (
+      {uiBuffering && !scrubbing && !playerError && (
         <View pointerEvents="none" style={styles.center}>
           <ActivityIndicator size="large" color="#fff" />
         </View>
@@ -604,15 +678,21 @@ export default function VideoPlayer({
               {title ?? ''}
             </Text>
             <View style={styles.topRight} pointerEvents="box-none">
-              <Pressable
-                hitSlop={12}
-                style={styles.iconButton}
-                onPress={() => {
-                  videoRef.current?.enterPictureInPicture();
-                  touch();
-                }}>
-                <PipIcon />
-              </Pressable>
+              {/* AirPlay (iOS): abre el selector de rutas del sistema. */}
+              <AirPlayButton style={styles.routeButton} iconColor="#fff" />
+              {/* Chromecast: el botón nativo se oculta solo si no hay dispositivos. */}
+              <CastButton style={styles.routeButton} tintColor="#fff" />
+              {!casting && (
+                <Pressable
+                  hitSlop={12}
+                  style={styles.iconButton}
+                  onPress={() => {
+                    videoRef.current?.enterPictureInPicture();
+                    touch();
+                  }}>
+                  <PipIcon />
+                </Pressable>
+              )}
               <Pressable
                 hitSlop={12}
                 style={styles.iconButton}
@@ -652,12 +732,12 @@ export default function VideoPlayer({
             </Pressable>
             <Pressable
               hitSlop={12}
-              style={[styles.playButton, buffering && styles.hidden]}
-              disabled={buffering}
+              style={[styles.playButton, uiBuffering && styles.hidden]}
+              disabled={uiBuffering}
               onPress={togglePlay}>
-              {ended ? (
+              {ended && !casting ? (
                 <ReplayIcon size={40} />
-              ) : paused ? (
+              ) : uiPaused ? (
                 <PlayIcon size={34} />
               ) : (
                 <PauseIcon size={34} />
@@ -708,15 +788,17 @@ export default function VideoPlayer({
                   <Text style={styles.timeDim}> / {formatTime(duration)}</Text>
                 </Text>
               )}
-              <Pressable
-                hitSlop={12}
-                style={styles.iconButton}
-                onPress={() => {
-                  setFullscreen(f => !f);
-                  touch();
-                }}>
-                <FullscreenIcon exit={fullscreen} />
-              </Pressable>
+              {!casting && (
+                <Pressable
+                  hitSlop={12}
+                  style={styles.iconButton}
+                  onPress={() => {
+                    setFullscreen(f => !f);
+                    touch();
+                  }}>
+                  <FullscreenIcon exit={fullscreen} />
+                </Pressable>
+              )}
             </View>
             {hasDvr ? (
               <SeekBar
@@ -761,14 +843,26 @@ export default function VideoPlayer({
             <>
               <MenuRow
                 label="Calidad"
-                value={qualityOptions.length ? qualityLabel(quality) : 'No disponible'}
-                disabled={!qualityOptions.length}
+                value={
+                  casting
+                    ? 'La elige el Chromecast'
+                    : qualityOptions.length
+                    ? qualityLabel(quality)
+                    : 'No disponible'
+                }
+                disabled={casting || !qualityOptions.length}
                 onPress={() => setMenu('quality')}
               />
               <MenuRow
                 label="Velocidad de reproducción"
-                value={isLive ? 'No disponible en directo' : speedLabel(rate)}
-                disabled={isLive}
+                value={
+                  casting
+                    ? 'No disponible al transmitir'
+                    : isLive
+                    ? 'No disponible en directo'
+                    : speedLabel(rate)
+                }
+                disabled={casting || isLive}
                 onPress={() => setMenu('speed')}
               />
             </>
@@ -998,6 +1092,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  // Los botones de AirPlay y de cast son vistas nativas: necesitan tamaño explícito.
+  routeButton: {width: 26, height: 26},
+  castOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    gap: 10,
+  },
+  castTitle: {color: '#fff', fontSize: 15, fontWeight: '600', textAlign: 'center'},
+  castDevice: {color: 'rgba(255,255,255,0.7)', fontSize: 12, textAlign: 'center'},
   time: {
     color: '#fff',
     fontSize: 12,

@@ -148,6 +148,43 @@ export function PipIcon({size = 22}: {size?: number}) {
   );
 }
 
+export function CastIcon({size = 48, color = WHITE}: {size?: number; color?: string}) {
+  // Pantalla con las tres ondas en la esquina inferior izquierda (icono de cast).
+  const wave = (index: number) => ({
+    position: 'absolute' as const,
+    left: size * 0.08,
+    bottom: size * 0.16,
+    width: size * (0.18 + index * 0.16),
+    height: size * (0.18 + index * 0.16),
+    borderColor: color,
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+    borderRightWidth: size * 0.045,
+    borderBottomWidth: size * 0.045,
+    borderBottomRightRadius: 2,
+    transform: [{rotate: '225deg'}],
+  });
+  return (
+    <View style={{width: size, height: size * 0.78}}>
+      <View
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: 0,
+          width: size * 0.86,
+          height: size * 0.68,
+          borderWidth: size * 0.05,
+          borderColor: color,
+          borderRadius: size * 0.08,
+        }}
+      />
+      <View style={{position: 'absolute', left: size * 0.06, bottom: size * 0.04, width: size * 0.1, height: size * 0.1, borderRadius: size * 0.05, backgroundColor: color}} />
+      <View style={wave(0)} />
+      <View style={wave(1)} />
+    </View>
+  );
+}
+
 export function SettingsIcon({size = 22}: {size?: number}) {
   return <Text style={{color: WHITE, fontSize: size, lineHeight: size * 1.2}}>⚙</Text>;
 }

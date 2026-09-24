@@ -111,6 +111,10 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // Chromecast: react-native-google-cast declara el SDK como `implementation`, así que
+    // MainActivity no lo vería en su classpath sin esta línea.
+    implementation("com.google.android.gms:play-services-cast-framework:${rootProject.ext.castFrameworkVersion}")
+
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {

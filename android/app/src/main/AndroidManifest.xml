@@ -23,5 +23,15 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+
+      <!-- Chromecast: el OptionsProvider que trae react-native-google-cast ya configura
+           la notificación y el controlador expandido. CC1AD845 es el Default Media
+           Receiver de Google (sirve para HLS/MP4 sin registrar una app propia). -->
+      <meta-data
+        android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+        android:value="com.reactnative.googlecast.GoogleCastOptionsProvider" />
+      <meta-data
+        android:name="com.reactnative.googlecast.RECEIVER_APPLICATION_ID"
+        android:value="CC1AD845" />
     </application>
 </manifest>

@@ -55,6 +55,7 @@ propio (sin fuentes de iconos ni módulos nativos extra para los controles):
 | ⛶ (abajo derecha) | Pantalla completa: rota a horizontal, botón atrás sale |
 | Spinner | Mientras hace buffering |
 | ▭ (arriba derecha, junto a ⚙) | Picture in Picture manual; también entra solo al salir de la app (`enterPictureInPictureOnLeave`) |
+| Botón de cast / AirPlay (arriba derecha) | Envía el vídeo a un Chromecast o a AirPlay (ver [Chromecast y AirPlay](#chromecast-y-airplay)) |
 
 ### Directos (live)
 
@@ -87,6 +88,53 @@ y volver al directo es `seek(currentTime + liveOffset)`.
   sigue montado. **No funciona en el simulador de iPhone** (`isPictureInPictureSupported`
   = NO); pruébalo en un dispositivo real.
 
+### Chromecast y AirPlay
+
+| | Chromecast | AirPlay |
+|---|---|---|
+| Plataforma | Android e iOS | Solo iOS |
+| Botón | `<CastButton>` de `react-native-google-cast` (se oculta solo si no hay dispositivos) | `<AirPlayButton>` de la librería (`../video_player`), envuelve `AVRoutePickerView` |
+| Quién reproduce | El receptor: la app pausa el vídeo local y manda la URL | AVPlayer enruta el vídeo él mismo (`allowsExternalPlayback`, activado por defecto) |
+
+**Chromecast** (`components/useCast.ts`): al conectar un dispositivo se carga en el
+receptor el vídeo actual (`loadMedia`) arrancando en la posición local, y el reproductor
+local se pausa. Mientras se transmite:
+
+- El overlay muestra "Transmitiendo a *dispositivo*" y los controles (play/pause, ±10 s,
+  barra) actúan sobre el receptor (`RemoteMediaClient`); tiempos y estado vienen de
+  `useMediaStatus`/`useStreamPosition`.
+- ⏮/⏭ cambian de vídeo en la lista y recargan el receptor.
+- Calidad y velocidad quedan desactivadas (las decide el receptor), igual que PiP y
+  pantalla completa.
+- Al desconectar, la reproducción local se reanuda en la posición donde iba el receptor.
+
+Configuración nativa:
+
+- Android: `castFrameworkVersion` en `android/build.gradle`, la dependencia
+  `play-services-cast-framework` en `app/build.gradle` (el módulo del paquete la declara
+  como `implementation`, así que `MainActivity` no la vería), las `meta-data` del
+  `OPTIONS_PROVIDER_CLASS_NAME` y del `RECEIVER_APPLICATION_ID` en el manifest, y
+  `RNGCCastContext.getSharedInstance(this)` en `MainActivity.onCreate` para que el
+  descubrimiento arranque con la app.
+- iOS: `GCKCastContext.setSharedInstanceWith(...)` en `AppDelegate.swift` y, en
+  `Info.plist`, `NSLocalNetworkUsageDescription` + `NSBonjourServices`
+  (`_googlecast._tcp` y `_CC1AD845._googlecast._tcp`). iOS 14+ pide permiso de red
+  local la primera vez que se toca el botón de cast.
+
+Se usa el **Default Media Receiver** de Google (`CC1AD845`), que reproduce HLS y MP4
+sin registrar una app receptora propia; para DRM, subtítulos personalizados o una UI
+propia en la tele hace falta registrar un receiver en la Cast Developer Console y
+cambiar ese id en los dos sitios.
+
+> Ni el emulador de Android ni el simulador de iOS descubren dispositivos reales
+> (la red del emulador está detrás de NAT y no pasa mDNS): el diálogo abre y se queda
+> en "Buscando dispositivos". Hay que probarlo en un móvil real en la misma red que el
+> Chromecast / Apple TV.
+
+**AirPlay**: el botón abre el selector de rutas del sistema (única forma soportada por
+iOS de iniciar AirPlay; no hay API para enrutar por código). El vídeo pasa a la tele
+solo, sin recargar nada, porque `<Video>` mantiene `allowsExternalPlayback`.
+
 ### Recuperación de errores y red
 
 - `<Video disableDisconnectError>`: en Android activa la política de reintentos de la
@@ -110,5 +158,7 @@ Dependencias nativas de la app (no de la librería):
 - `react-native-safe-area-context` — insets de barras del sistema (Android 15 es
   edge-to-edge) para que los controles no queden bajo la barra de navegación.
 - `@react-native-community/netinfo` — estado de la conexión para la recuperación.
+- `react-native-google-cast` — Chromecast (el botón y la sesión); AirPlay no necesita
+  dependencia extra, el botón lo añade la propia librería `react-native-video`.
 
 `App.tsx` alterna entre un stream HLS y un MP4 públicos.

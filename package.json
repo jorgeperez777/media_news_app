@@ -13,6 +13,7 @@
     "@react-native-community/netinfo": "^12.0.1",
     "react": "19.0.0",
     "react-native": "0.78.3",
+    "react-native-google-cast": "4.9.1",
     "react-native-orientation-locker": "^1.7.0",
     "react-native-safe-area-context": "^5.10.0",
     "react-native-video": "link:../video_player"

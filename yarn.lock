@@ -2813,6 +2813,7 @@ __metadata:
     prettier: 2.8.8
     react: 19.0.0
     react-native: 0.78.3
+    react-native-google-cast: 4.9.1
     react-native-orientation-locker: ^1.7.0
     react-native-safe-area-context: ^5.10.0
     react-native-video: "link:../video_player"
@@ -7480,6 +7481,16 @@ __metadata:
   version: 19.3.0
   resolution: "react-is@npm:19.3.0"
   checksum: c7170b2f1f8bc91cb14c94849a5463a84360b8737d9829aa48c9ef314c1442bc87a2e93e167da45c74ebdbf5b912bdc2fab3c993df495adde3223d533edd6f3b
+  languageName: node
+  linkType: hard
+
+"react-native-google-cast@npm:4.9.1":
+  version: 4.9.1
+  resolution: "react-native-google-cast@npm:4.9.1"
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: f73feb3b85929775d168bf7b66de837428157797071163fc5f5b41f7c3044657ff3e98d3c68483c240bd07774e963db5d77e57bae3f0aba4cad80bf5031a5c85
   languageName: node
   linkType: hard
 
