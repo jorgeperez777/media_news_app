@@ -16,6 +16,7 @@
     "react-native-google-cast": "4.9.1",
     "react-native-orientation-locker": "^1.7.0",
     "react-native-safe-area-context": "^5.10.0",
+    "react-native-svg": "^15.15.5",
     "react-native-video": "link:../video_player"
   },
   "devDependencies": {

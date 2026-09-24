@@ -79,7 +79,8 @@ se queda igual, fuera del navigator.
 ## Controles estilo YouTube
 
 `components/VideoPlayer.tsx` envuelve `<Video controls={false}>` con un overlay
-propio (sin fuentes de iconos ni módulos nativos extra para los controles):
+propio. Los iconos son SVG (`components/icons.tsx`, con `react-native-svg`) sobre la
+geometría de Material Symbols: un viewBox 24×24 común, color y tamaño por prop:
 
 | Gesto / control | Comportamiento |
 |---|---|
@@ -222,6 +223,7 @@ Dependencias nativas de la app (no de la librería):
 - `@react-native-community/netinfo` — estado de la conexión para la recuperación.
 - `react-native-google-cast` — Chromecast (el botón y la sesión); AirPlay no necesita
   dependencia extra, el botón lo añade la propia librería `react-native-video`.
+- `react-native-svg` — los iconos de los controles.
 
 Las fuentes de prueba están en `sources.ts`: un directo HLS con DVR, un VOD HLS
 multi-calidad, una URL rota (404) para probar la recuperación y un MP4 progresivo.

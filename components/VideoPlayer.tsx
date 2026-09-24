@@ -655,7 +655,7 @@ export default function VideoPlayer({
               el dispositivo se lee en la fila de abajo. */}
           {!controlsVisible && (
             <>
-              <AirPlayGlyph />
+              <AirPlayGlyph size={56} />
               <Text style={styles.castTitle} numberOfLines={1}>
                 {title ?? ''}
               </Text>
@@ -674,7 +674,7 @@ export default function VideoPlayer({
               botones centrales y el dispositivo ya se lee bajo el título. */}
           {!controlsVisible && (
             <>
-              <CastIcon size={56} />
+              <CastIcon size={56} connected />
               <Text style={styles.castTitle} numberOfLines={1}>
                 {title ?? ''}
               </Text>
@@ -941,7 +941,7 @@ export default function VideoPlayer({
                 controlador ampliado del SDK (volumen, audio/subtítulos del receptor). */}
             {airplay.active && !casting && (
               <View style={styles.castDeviceRow} pointerEvents="none">
-                <AirPlayGlyph size={16} />
+                <AirPlayGlyph size={18} color="rgba(255,255,255,0.8)" />
                 <Text style={styles.castDeviceRowText} numberOfLines={1}>
                   {airplay.deviceName ?? 'AirPlay'}
                 </Text>
@@ -955,7 +955,7 @@ export default function VideoPlayer({
                   cast.showRemoteControls();
                   touch();
                 }}>
-                <CastIcon size={18} color="rgba(255,255,255,0.8)" />
+                <CastIcon size={18} color="rgba(255,255,255,0.8)" connected />
                 <Text style={styles.castDeviceRowText} numberOfLines={1}>
                   {cast.loadError
                     ? `No se pudo transmitir: ${cast.loadError}`
