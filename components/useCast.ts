@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {
+import GoogleCast, {
   MediaPlayerState,
   MediaStreamType,
   useCastDevice,
@@ -128,6 +128,20 @@ export default function useCast({
     (seconds: number) => client?.seek({position: Math.max(0, seconds)}),
     [client],
   );
+  /** Termina la sesión y apaga la reproducción en el receptor. */
+  const stop = useCallback(
+    () => GoogleCast.getSessionManager().endCurrentSession(true),
+    [],
+  );
+  /**
+   * Abre el controlador ampliado nativo del SDK (Android: RNGCExpandedControllerActivity,
+   * iOS: los controles ampliados por defecto): carátula, volumen del dispositivo,
+   * pistas de audio/subtítulos del receptor y desconectar.
+   */
+  const showRemoteControls = useCallback(
+    () => GoogleCast.showExpandedControls(),
+    [],
+  );
   const playerState = status?.playerState ?? null;
 
   return {
@@ -145,5 +159,7 @@ export default function useCast({
     play,
     pause,
     seek,
+    stop,
+    showRemoteControls,
   };
 }

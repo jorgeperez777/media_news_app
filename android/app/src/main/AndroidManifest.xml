@@ -24,6 +24,20 @@
         </intent-filter>
       </activity>
 
+      <!-- Controlador ampliado de Chromecast (la pantalla con carátula, volumen y
+           pistas del receptor). La librería no la declara: hay que hacerlo aquí o
+           showExpandedControls() y la notificación fallan con ActivityNotFoundException. -->
+      <activity
+        android:name="com.reactnative.googlecast.RNGCExpandedControllerActivity"
+        android:label="@string/app_name"
+        android:launchMode="singleTask"
+        android:exported="false"
+        android:theme="@style/Theme.AppCompat.NoActionBar">
+        <meta-data
+          android:name="android.support.PARENT_ACTIVITY"
+          android:value=".MainActivity" />
+      </activity>
+
       <!-- Chromecast: el OptionsProvider que trae react-native-google-cast ya configura
            la notificación y el controlador expandido. CC1AD845 es el Default Media
            Receiver de Google (sirve para HLS/MP4 sin registrar una app propia). -->

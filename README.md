@@ -100,9 +100,13 @@ y volver al directo es `seek(currentTime + liveOffset)`.
 receptor el vídeo actual (`loadMedia`) arrancando en la posición local, y el reproductor
 local se pausa. Mientras se transmite:
 
-- El overlay muestra "Transmitiendo a *dispositivo*" y los controles (play/pause, ±10 s,
-  barra) actúan sobre el receptor (`RemoteMediaClient`); tiempos y estado vienen de
-  `useMediaStatus`/`useStreamPosition`.
+- Los controles siguen en el reproductor (como en Netflix): ⏮ · ⟲10 · play/pause · ⟳10 ·
+  ⏭ · **⏹ (detener)**, tiempos y barra del receptor (`useMediaStatus`/`useStreamPosition`),
+  y debajo el nombre del dispositivo. Tocarlo abre el **controlador ampliado nativo**
+  (`GoogleCast.showExpandedControls()`): carátula, volumen del dispositivo, pistas de
+  audio/subtítulos del receptor y desconectar.
+- Con los controles ocultos queda la pantalla de transmisión: icono de cast, título y
+  "Transmitiendo a *dispositivo*".
 - ⏮/⏭ cambian de vídeo en la lista y recargan el receptor.
 - Calidad y velocidad quedan desactivadas (las decide el receptor), igual que PiP y
   pantalla completa.
@@ -110,7 +114,9 @@ local se pausa. Mientras se transmite:
 
 Configuración nativa:
 
-- Android: `castFrameworkVersion` en `android/build.gradle`, la dependencia
+- Android: la Activity `RNGCExpandedControllerActivity` declarada en el manifest (la
+  librería no la declara y sin ella el controlador ampliado y la notificación revientan
+  con `ActivityNotFoundException`), `castFrameworkVersion` en `android/build.gradle`, la dependencia
   `play-services-cast-framework` en `app/build.gradle` (el módulo del paquete la declara
   como `implementation`, así que `MainActivity` no la vería), las `meta-data` del
   `OPTIONS_PROVIDER_CLASS_NAME` y del `RECEIVER_APPLICATION_ID` en el manifest, y
@@ -128,8 +134,10 @@ cambiar ese id en los dos sitios.
 
 > Ni el emulador de Android ni el simulador de iOS descubren dispositivos reales
 > (la red del emulador está detrás de NAT y no pasa mDNS): el diálogo abre y se queda
-> en "Buscando dispositivos". Hay que probarlo en un móvil real en la misma red que el
-> Chromecast / Apple TV.
+> en "Buscando dispositivos". Además, la imagen del emulador no trae el módulo
+> `cast.framework.dynamite` de Play Services, así que el controlador ampliado nativo
+> allí falla (`ModuleUnavailableException`). Hay que probarlo en un móvil real en la
+> misma red que el Chromecast / Apple TV.
 
 **AirPlay**: el botón abre el selector de rutas del sistema (única forma soportada por
 iOS de iniciar AirPlay; no hay API para enrutar por código). El vídeo pasa a la tele

@@ -33,6 +33,7 @@ import useCast from './useCast';
 import {
   CastIcon,
   FullscreenIcon,
+  StopIcon,
   PipIcon,
   PauseIcon,
   PlayIcon,
@@ -680,18 +681,9 @@ export default function VideoPlayer({
 
           {/* Barra superior */}
           <View style={styles.topBar} pointerEvents="box-none">
-            <View style={styles.topLeft} pointerEvents="none">
-              <Text style={styles.title} numberOfLines={1}>
-                {title ?? ''}
-              </Text>
-              {casting && (
-                <Text style={styles.castDeviceSmall} numberOfLines={1}>
-                  {cast.loadError
-                    ? `No se pudo transmitir: ${cast.loadError}`
-                    : `Transmitiendo a ${cast.deviceName}`}
-                </Text>
-              )}
-            </View>
+            <Text style={styles.title} numberOfLines={1}>
+              {title ?? ''}
+            </Text>
             <View style={styles.topRight} pointerEvents="box-none">
               {/* AirPlay (iOS): abre el selector de rutas del sistema. */}
               <AirPlayButton style={styles.routeButton} iconColor="#fff" />
@@ -777,6 +769,17 @@ export default function VideoPlayer({
                 <TrackIcon direction="next" />
               </Pressable>
             )}
+            {casting && (
+              <Pressable
+                hitSlop={12}
+                style={styles.iconButton}
+                onPress={() => {
+                  cast.stop();
+                  touch();
+                }}>
+                <StopIcon size={22} />
+              </Pressable>
+            )}
           </View>
 
           {/* Barra inferior */}
@@ -839,6 +842,24 @@ export default function VideoPlayer({
               />
             ) : (
               <View style={styles.seekBarSpacer} />
+            )}
+
+            {/* Como en Netflix: el dispositivo abajo; al tocarlo se abre el
+                controlador ampliado del SDK (volumen, audio/subtítulos del receptor). */}
+            {casting && (
+              <Pressable
+                style={({pressed}) => [styles.castDeviceRow, pressed && styles.dimmed]}
+                onPress={() => {
+                  cast.showRemoteControls();
+                  touch();
+                }}>
+                <CastIcon size={18} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.castDeviceRowText} numberOfLines={1}>
+                  {cast.loadError
+                    ? `No se pudo transmitir: ${cast.loadError}`
+                    : cast.deviceName}
+                </Text>
+              </Pressable>
             )}
           </View>
         </View>
@@ -999,26 +1020,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 8,
   },
-  topLeft: {
-    flex: 1,
-    marginRight: 12,
-  },
   title: {
+    flex: 1,
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+    marginRight: 12,
   },
-  castDeviceSmall: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 11,
-    marginTop: 2,
+  castDeviceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingTop: 10,
+    paddingBottom: 4,
   },
+  castDeviceRowText: {color: 'rgba(255,255,255,0.8)', fontSize: 12},
   centerRow: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 28,
+    paddingHorizontal: 12,
+    // Con 6 botones (transmitiendo) el hueco fijo no cabe en pantallas estrechas.
+    gap: 20,
   },
   iconButton: {
     padding: 6,

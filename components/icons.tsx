@@ -148,6 +148,10 @@ export function PipIcon({size = 22}: {size?: number}) {
   );
 }
 
+export function StopIcon({size = 26}: {size?: number}) {
+  return <View style={{width: size, height: size, backgroundColor: WHITE, borderRadius: 3}} />;
+}
+
 export function CastIcon({size = 48, color = WHITE}: {size?: number; color?: string}) {
   // Pantalla con las tres ondas en la esquina inferior izquierda (icono de cast).
   const wave = (index: number) => ({
