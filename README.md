@@ -39,6 +39,42 @@ yarn ios              # simulador iOS
 | `android/**` (Kotlin/Java) | `yarn android` de nuevo |
 | `ios/**` (Swift/ObjC) | `yarn ios` de nuevo (si añades archivos, `pod install` antes) |
 
+## Estructura: lista, detalle y miniplayer
+
+```
+App.tsx ─ PlayerProvider (player/PlayerContext.tsx)
+          ├─ ListScreen / DetailScreen      ← las pantallas se intercambian
+          └─ PlayerHost (components/PlayerHost.tsx)  ← el <VideoPlayer>, siempre montado
+```
+
+El miniplayer estilo YouTube exige que **la instancia de `<Video>` no se desmonte** al
+cambiar de pantalla: en React Native no se puede reparentar una vista nativa, así que si
+el reproductor viviera dentro de la pantalla de detalle, volver a la lista liberaría
+ExoPlayer/AVPlayer y la reproducción se reiniciaría.
+
+Por eso el vídeo vive en `PlayerHost`, en la raíz y en posición absoluta, y lo único que
+se anima es su geometría entre dos cajas:
+
+| | Expandido | Miniplayer |
+|---|---|---|
+| Geometría | El hueco que reserva `DetailScreen` (lo mide y lo publica en el contexto) | Barra de 72 px abajo, con el vídeo a la izquierda |
+| Controles | Los de siempre (`VideoPlayer`) | `compact`: sin overlay; la barra pone título, ⏯ y ✕ |
+| Gestos | Arrastrar hacia abajo minimiza | Tocar expande · arrastrar hacia abajo cierra |
+
+Detalles que costaron una pasada de pruebas:
+
+- El hueco se mide con `measureLayout` **contra la vista raíz**, no con `measureInWindow`:
+  en Android sus coordenadas no incluyen la barra de estado y el vídeo salía desplazado.
+- Hay que volver a medir cuando cambian los insets o el tamaño de ventana (en iOS los
+  insets llegan después del primer render y el `onLayout` del hueco no vuelve a dispararse).
+- En pantalla completa y en PiP el host deja de acotar (pasa a `absoluteFill`), porque
+  ahí el reproductor se coloca él mismo.
+- `paused` se levanta al contexto (props `paused`/`onPausedChange` de `VideoPlayer`) para
+  que el ⏯ de la barra y el del reproductor grande sean el mismo estado.
+
+No hay `react-navigation`: las pantallas se intercambian con estado. Si se añade, el host
+se queda igual, fuera del navigator.
+
 ## Controles estilo YouTube
 
 `components/VideoPlayer.tsx` envuelve `<Video controls={false}>` con un overlay
@@ -185,4 +221,5 @@ Dependencias nativas de la app (no de la librería):
 - `react-native-google-cast` — Chromecast (el botón y la sesión); AirPlay no necesita
   dependencia extra, el botón lo añade la propia librería `react-native-video`.
 
-`App.tsx` alterna entre un stream HLS y un MP4 públicos.
+Las fuentes de prueba están en `sources.ts`: un directo HLS con DVR, un VOD HLS
+multi-calidad, una URL rota (404) para probar la recuperación y un MP4 progresivo.

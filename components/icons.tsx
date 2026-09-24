@@ -180,6 +180,22 @@ export function AirPlayGlyph({size = 48, color = WHITE}: {size?: number; color?:
   );
 }
 
+export function CloseIcon({size = 22}: {size?: number}) {
+  const bar = {
+    position: 'absolute' as const,
+    width: size,
+    height: 2,
+    backgroundColor: WHITE,
+    borderRadius: 1,
+  };
+  return (
+    <View style={{width: size, height: size, alignItems: 'center', justifyContent: 'center'}}>
+      <View style={[bar, {transform: [{rotate: '45deg'}]}]} />
+      <View style={[bar, {transform: [{rotate: '-45deg'}]}]} />
+    </View>
+  );
+}
+
 export function StopIcon({size = 26}: {size?: number}) {
   return <View style={{width: size, height: size, backgroundColor: WHITE, borderRadius: 3}} />;
 }

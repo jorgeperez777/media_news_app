@@ -77,6 +77,18 @@ type Props = {
   hasPrevious?: boolean;
   /** Reproducir el siguiente automáticamente al terminar (por defecto true). */
   autoplayNext?: boolean;
+  /**
+   * Modo miniplayer: solo el vídeo, sin overlay ni gestos. Quien lo use dibuja
+   * sus propios controles encima (ver `PlayerHost`).
+   */
+  compact?: boolean;
+  /**
+   * Pausa controlada desde fuera. Si se pasa, manda el padre (hace falta para que
+   * el miniplayer y el reproductor grande compartan el mismo estado); si no, el
+   * reproductor la gestiona él solo.
+   */
+  paused?: boolean;
+  onPausedChange?: (paused: boolean) => void;
 };
 
 // ⏮ con más de este tiempo reproducido vuelve al inicio en vez de al anterior (como YouTube).
@@ -103,11 +115,32 @@ export default function VideoPlayer({
   hasNext = false,
   hasPrevious = false,
   autoplayNext = true,
+  compact = false,
+  paused: pausedProp,
+  onPausedChange,
 }: Props) {
   const videoRef = useRef<VideoRef>(null);
   const insets = useSafeAreaInsets();
 
-  const [paused, setPaused] = useState(false);
+  const [ownPaused, setOwnPaused] = useState(false);
+  const paused = pausedProp ?? ownPaused;
+  // Espejo del valor actual: los setPaused(p => !p) se resuelven contra él, así el
+  // callback no depende de `paused` ni se recrea en cada cambio.
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  const setPaused = useCallback(
+    (next: boolean | ((previous: boolean) => boolean)) => {
+      const value = typeof next === 'function' ? next(pausedRef.current) : next;
+      pausedRef.current = value;
+      if (onPausedChange) {
+        onPausedChange(value);
+      }
+      if (pausedProp === undefined) {
+        setOwnPaused(value);
+      }
+    },
+    [onPausedChange, pausedProp],
+  );
   const [ended, setEnded] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -253,7 +286,7 @@ export default function VideoPlayer({
     setBuffering(true);
     setPaused(false);
     setPlayerKey(k => k + 1); // remonta <Video> → la librería vuelve a preparar el source
-  }, []);
+  }, [setPaused]);
 
   // Reintento manual (botón) o forzado por la red: reinicia la cuenta de intentos.
   useEffect(() => {
@@ -333,7 +366,7 @@ export default function VideoPlayer({
     setCurrentTime(target);
     setPaused(false);
     touch();
-  }, [currentTime, liveOffset, seekableDuration, touch]);
+  }, [currentTime, liveOffset, seekableDuration, setPaused, touch]);
 
   const togglePlay = useCallback(() => {
     if (casting) {
@@ -353,7 +386,7 @@ export default function VideoPlayer({
       setPaused(p => !p);
     }
     touch();
-  }, [cast, casting, ended, seekTo, touch]);
+  }, [cast, casting, ended, seekTo, setPaused, touch]);
 
   // showHint: el indicador lateral solo se muestra con el gesto de doble tap.
   const skip = useCallback(
@@ -550,7 +583,7 @@ export default function VideoPlayer({
   };
 
   const containerStyle =
-    fullscreen || pipActive
+    (fullscreen || pipActive) && !compact
       ? [styles.container, styles.fullscreen]
       : [styles.container, style];
 
@@ -560,7 +593,7 @@ export default function VideoPlayer({
       onLayout={e => {
         surfaceWidth.current = e.nativeEvent.layout.width || 1;
       }}>
-      <StatusBar hidden={fullscreen} />
+      <StatusBar hidden={fullscreen && !compact} />
 
       <Video
         key={playerKey}
@@ -601,8 +634,11 @@ export default function VideoPlayer({
         onError={onPlayerError}
       />
 
-      {/* Superficie táctil: tap / doble tap */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={onSurfacePress} />
+      {/* Superficie táctil: tap / doble tap. En miniplayer los gestos los maneja quien
+          nos envuelve, así que aquí no se pinta nada más que el vídeo. */}
+      {!compact && (
+        <Pressable style={StyleSheet.absoluteFill} onPress={onSurfacePress} />
+      )}
 
       {/* AirPlay: el vídeo se ve en la tele; aquí queda el estado (los controles siguen
           gobernando el mismo AVPlayer, por eso no hay controles remotos aparte) */}
@@ -645,6 +681,8 @@ export default function VideoPlayer({
         </View>
       )}
 
+      {!compact && (
+        <>
       {/* Indicador de salto (±10 s) */}
       {skipHint && (
         <View
@@ -986,6 +1024,8 @@ export default function VideoPlayer({
           )}
         </View>
       </Modal>
+        </>
+      )}
     </View>
   );
 }
