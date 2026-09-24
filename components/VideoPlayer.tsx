@@ -594,15 +594,21 @@ export default function VideoPlayer({
       {/* Transmitiendo: el vídeo se ve en el Chromecast, aquí queda el estado */}
       {casting && (
         <View pointerEvents="none" style={styles.castOverlay}>
-          <CastIcon size={56} />
-          <Text style={styles.castTitle} numberOfLines={1}>
-            {title ?? ''}
-          </Text>
-          <Text style={styles.castDevice} numberOfLines={1}>
-            {cast.loadError
-              ? `No se pudo transmitir: ${cast.loadError}`
-              : `Transmitiendo a ${cast.deviceName}`}
-          </Text>
+          {/* Con los controles visibles solo queda el fondo: el icono estorbaría a los
+              botones centrales y el dispositivo ya se lee bajo el título. */}
+          {!controlsVisible && (
+            <>
+              <CastIcon size={56} />
+              <Text style={styles.castTitle} numberOfLines={1}>
+                {title ?? ''}
+              </Text>
+              <Text style={styles.castDevice} numberOfLines={1}>
+                {cast.loadError
+                  ? `No se pudo transmitir: ${cast.loadError}`
+                  : `Transmitiendo a ${cast.deviceName}`}
+              </Text>
+            </>
+          )}
         </View>
       )}
 
@@ -674,9 +680,18 @@ export default function VideoPlayer({
 
           {/* Barra superior */}
           <View style={styles.topBar} pointerEvents="box-none">
-            <Text style={styles.title} numberOfLines={1}>
-              {title ?? ''}
-            </Text>
+            <View style={styles.topLeft} pointerEvents="none">
+              <Text style={styles.title} numberOfLines={1}>
+                {title ?? ''}
+              </Text>
+              {casting && (
+                <Text style={styles.castDeviceSmall} numberOfLines={1}>
+                  {cast.loadError
+                    ? `No se pudo transmitir: ${cast.loadError}`
+                    : `Transmitiendo a ${cast.deviceName}`}
+                </Text>
+              )}
+            </View>
             <View style={styles.topRight} pointerEvents="box-none">
               {/* AirPlay (iOS): abre el selector de rutas del sistema. */}
               <AirPlayButton style={styles.routeButton} iconColor="#fff" />
@@ -984,12 +999,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 8,
   },
-  title: {
+  topLeft: {
     flex: 1,
+    marginRight: 12,
+  },
+  title: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
-    marginRight: 12,
+  },
+  castDeviceSmall: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 11,
+    marginTop: 2,
   },
   centerRow: {
     flex: 1,
@@ -1096,7 +1118,7 @@ const styles = StyleSheet.create({
   routeButton: {width: 26, height: 26},
   castOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.9)',
+    backgroundColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
