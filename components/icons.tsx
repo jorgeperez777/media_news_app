@@ -148,6 +148,38 @@ export function PipIcon({size = 22}: {size?: number}) {
   );
 }
 
+export function AirPlayGlyph({size = 48, color = WHITE}: {size?: number; color?: string}) {
+  // Pantalla con el triángulo debajo (icono de AirPlay). El botón de la barra es la
+  // vista nativa; este es solo para el aviso de "reproduciendo en …".
+  return (
+    <View style={{width: size, height: size * 0.82, alignItems: 'center'}}>
+      <View
+        style={{
+          width: size,
+          height: size * 0.6,
+          borderWidth: size * 0.05,
+          borderColor: color,
+          borderRadius: size * 0.08,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          width: 0,
+          height: 0,
+          borderLeftWidth: size * 0.22,
+          borderRightWidth: size * 0.22,
+          borderBottomWidth: size * 0.3,
+          borderLeftColor: 'transparent',
+          borderRightColor: 'transparent',
+          borderBottomColor: color,
+        }}
+      />
+    </View>
+  );
+}
+
 export function StopIcon({size = 26}: {size?: number}) {
   return <View style={{width: size, height: size, backgroundColor: WHITE, borderRadius: 3}} />;
 }

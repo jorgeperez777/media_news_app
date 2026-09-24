@@ -143,6 +143,22 @@ cambiar ese id en los dos sitios.
 iOS de iniciar AirPlay; no hay API para enrutar por código). El vídeo pasa a la tele
 solo, sin recargar nada, porque `<Video>` mantiene `allowsExternalPlayback`.
 
+A diferencia de Chromecast **no hay controles remotos aparte**: el vídeo lo sigue
+reproduciendo el mismo AVPlayer, así que play/pause, ±10 s, barra, calidad y velocidad
+funcionan igual que en local. Lo único que cambia es lo que se ve en el móvil:
+
+- `onExternalPlaybackChange` avisa de que la reproducción se fue a la tele y **con qué
+  dispositivo** (el campo `deviceName` se añadió a la librería: AVPlayer no expone la
+  ruta, se lee del `AVAudioSession`).
+- Controles visibles: el icono de AirPlay se pinta en azul y bajo la barra aparece el
+  nombre del dispositivo.
+- Controles ocultos: pantalla con el icono de AirPlay, el título y "Reproduciendo en
+  *dispositivo*".
+- PiP se oculta (no hay vídeo local que meter en la ventanita).
+
+Para volver al móvil se usa el mismo selector de rutas (elegir "iPhone"), como en
+cualquier app de Apple.
+
 ### Recuperación de errores y red
 
 - `<Video disableDisconnectError>`: en Android activa la política de reintentos de la

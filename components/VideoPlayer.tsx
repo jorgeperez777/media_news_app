@@ -20,6 +20,7 @@ import Video, {
   AirPlayButton,
   SelectedVideoTrackType,
   type OnBufferData,
+  type OnExternalPlaybackChangeData,
   type OnLoadData,
   type OnProgressData,
   type OnVideoErrorData,
@@ -31,6 +32,7 @@ import Video, {
 import SeekBar from './SeekBar';
 import useCast from './useCast';
 import {
+  AirPlayGlyph,
   CastIcon,
   FullscreenIcon,
   StopIcon,
@@ -121,6 +123,11 @@ export default function VideoPlayer({
   // Picture in Picture. En Android la ventana PiP muestra la Activity entera escalada,
   // así que mientras está activo ocultamos los controles y el vídeo ocupa todo.
   const [pipActive, setPipActive] = useState(false);
+  // AirPlay (iOS): AVPlayer enruta el vídeo él mismo; aquí solo sabemos que está activo
+  // y a qué dispositivo va, para avisarlo en pantalla.
+  const [airplay, setAirplay] = useState<{active: boolean; deviceName?: string | null}>({
+    active: false,
+  });
   const [controlsVisible, setControlsVisible] = useState(true);
   // Menú ⚙: principal → Calidad / Velocidad.
   const [menu, setMenu] = useState<'main' | 'quality' | 'speed' | null>(null);
@@ -570,6 +577,11 @@ export default function VideoPlayer({
         // PiP automático al salir de la app (Android 12+ / iOS 14.2+) y manual con el botón.
         enterPictureInPictureOnLeave
         onPictureInPictureStatusChanged={e => setPipActive(e.isActive)}
+        // AirPlay: el vídeo sale por la tele, pero lo sigue reproduciendo este <Video>,
+        // así que los controles valen igual; solo cambia lo que se ve en el móvil.
+        onExternalPlaybackChange={(e: OnExternalPlaybackChangeData) =>
+          setAirplay({active: e.isExternalPlaybackActive, deviceName: e.deviceName})
+        }
         // iOS: el usuario tocó "volver a la app" desde la ventana PiP; ya no hay nada que
         // restaurar (el reproductor sigue montado), así que confirmamos de inmediato.
         onRestoreUserInterfaceForPictureInPictureStop={() =>
@@ -591,6 +603,26 @@ export default function VideoPlayer({
 
       {/* Superficie táctil: tap / doble tap */}
       <Pressable style={StyleSheet.absoluteFill} onPress={onSurfacePress} />
+
+      {/* AirPlay: el vídeo se ve en la tele; aquí queda el estado (los controles siguen
+          gobernando el mismo AVPlayer, por eso no hay controles remotos aparte) */}
+      {airplay.active && !casting && (
+        <View pointerEvents="none" style={styles.castOverlay}>
+          {/* Igual que al transmitir: con los controles visibles solo queda el fondo,
+              el dispositivo se lee en la fila de abajo. */}
+          {!controlsVisible && (
+            <>
+              <AirPlayGlyph />
+              <Text style={styles.castTitle} numberOfLines={1}>
+                {title ?? ''}
+              </Text>
+              <Text style={styles.castDevice} numberOfLines={1}>
+                {`Reproduciendo en ${airplay.deviceName ?? 'AirPlay'}`}
+              </Text>
+            </>
+          )}
+        </View>
+      )}
 
       {/* Transmitiendo: el vídeo se ve en el Chromecast, aquí queda el estado */}
       {casting && (
@@ -686,10 +718,14 @@ export default function VideoPlayer({
             </Text>
             <View style={styles.topRight} pointerEvents="box-none">
               {/* AirPlay (iOS): abre el selector de rutas del sistema. */}
-              <AirPlayButton style={styles.routeButton} iconColor="#fff" />
+              <AirPlayButton
+                style={styles.routeButton}
+                iconColor="#fff"
+                activeIconColor="#3ea6ff"
+              />
               {/* Chromecast: el botón nativo se oculta solo si no hay dispositivos. */}
               <CastButton style={styles.routeButton} tintColor="#fff" />
-              {!casting && (
+              {!casting && !airplay.active && (
                 <Pressable
                   hitSlop={12}
                   style={styles.iconButton}
@@ -846,6 +882,15 @@ export default function VideoPlayer({
 
             {/* Como en Netflix: el dispositivo abajo; al tocarlo se abre el
                 controlador ampliado del SDK (volumen, audio/subtítulos del receptor). */}
+            {airplay.active && !casting && (
+              <View style={styles.castDeviceRow} pointerEvents="none">
+                <AirPlayGlyph size={16} />
+                <Text style={styles.castDeviceRowText} numberOfLines={1}>
+                  {airplay.deviceName ?? 'AirPlay'}
+                </Text>
+              </View>
+            )}
+
             {casting && (
               <Pressable
                 style={({pressed}) => [styles.castDeviceRow, pressed && styles.dimmed]}
