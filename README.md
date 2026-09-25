@@ -232,7 +232,11 @@ cualquier app de Apple.
   automático con backoff 2/4/8/16/30 s remontando `<Video>` y reanudando desde la
   última posición (VOD) o desde el directo (live). Sin red, espera a NetInfo en vez
   de gastar reintentos.
-- La fuente "URL rota" (404) de `App.tsx` sirve para probar este flujo.
+- Mientras hay error los controles no se dibujan, así que el overlay lleva su propia
+  salida arriba a la izquierda: ⤢ para dejar la pantalla completa o ⌄ para bajar al
+  miniplayer. Sin ella, un error persistente en fullscreen dejaba la app atrapada en
+  iOS (en Android salía el botón Atrás).
+- La fuente "URL rota" (404) de `sources.ts` sirve para probar este flujo.
 
 Dependencias nativas de la app (no de la librería):
 

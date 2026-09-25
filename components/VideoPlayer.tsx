@@ -722,6 +722,31 @@ export default function VideoPlayer({
       {/* Error con reintento */}
       {playerError && (
         <View style={styles.errorOverlay}>
+          {/* Salida de emergencia: con un error los controles no se dibujan, así que
+              este es el único botón para dejar la pantalla completa (o bajar al
+              miniplayer). En iOS no hay botón Atrás con el que escapar. */}
+          {(fullscreen || onMinimize) && !pipActive && (
+            <View
+              pointerEvents="box-none"
+              style={[styles.errorEscape, fullscreen && controlsInsets]}>
+              <Pressable
+                hitSlop={12}
+                style={styles.iconButton}
+                onPress={() => {
+                  if (fullscreen) {
+                    setFullscreen(false);
+                  } else {
+                    onMinimize?.();
+                  }
+                }}>
+                {fullscreen ? (
+                  <FullscreenIcon exit />
+                ) : (
+                  <ChevronIcon direction="down" />
+                )}
+              </Pressable>
+            </View>
+          )}
           <Text style={styles.errorTitle}>
             {online ? 'No se pudo reproducir el vídeo' : 'Sin conexión a internet'}
           </Text>
@@ -1219,6 +1244,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     gap: 8,
+  },
+  errorEscape: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   errorTitle: {color: '#fff', fontSize: 16, fontWeight: '700', textAlign: 'center'},
   errorDetail: {color: 'rgba(255,255,255,0.7)', fontSize: 12, textAlign: 'center'},
