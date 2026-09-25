@@ -98,8 +98,10 @@ export default function PlayerHost() {
           onMinimize={player.minimize}
           hasPrevious={player.hasPrevious}
           hasNext={player.hasNext}
-          onPrevious={() => player.goTo(index - 1)}
-          onNext={() => player.goTo(index + 1)}
+          onPrevious={() =>
+            player.previousIndex !== null && player.goTo(player.previousIndex)
+          }
+          onNext={() => player.nextIndex !== null && player.goTo(player.nextIndex)}
         />
       </View>
 

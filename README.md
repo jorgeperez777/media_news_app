@@ -39,14 +39,19 @@ yarn ios              # simulador iOS
 | `android/**` (Kotlin/Java) | `yarn android` de nuevo |
 | `ios/**` (Swift/ObjC) | `yarn ios` de nuevo (si añades archivos, `pod install` antes) |
 
-## Estructura: lista, detalle y miniplayer
+## Estructura: TV en vivo, lista, detalle y miniplayer
 
 ```
 App.tsx ─ PlayerProvider (player/PlayerContext.tsx)
-          ├─ ListScreen / DetailScreen / PlaceholderScreen  ← según la pestaña
-          ├─ TabBar (components/TabBar.tsx)                 ← Vídeos · Buscar · Perfil
+          ├─ LiveScreen / ListScreen / DetailScreen / PlaceholderScreen  ← según la pestaña
+          ├─ TabBar (components/TabBar.tsx)          ← TV en vivo · Vídeos · Buscar · Perfil
           └─ PlayerHost (components/PlayerHost.tsx)  ← el <VideoPlayer>, siempre montado
 ```
+
+El catálogo (`sources.ts`) marca cada entrada con `kind`: los `live` salen en **TV en
+vivo** y los `vod` en **Vídeos**. `LIVE_CHANNELS` y `VOD_ITEMS` son las dos vistas del
+mismo array, cada una con el índice global que usa el reproductor, así que ⏮/⏭ se mueven
+dentro de la sección del elemento actual (un canal no salta a un vídeo a la carta).
 
 El miniplayer estilo YouTube exige que **la instancia de `<Video>` no se desmonte** al
 cambiar de pantalla: en React Native no se puede reparentar una vista nativa, así que si
@@ -68,7 +73,16 @@ redibuja ya en la barra de abajo, sin animación de colapso ni gesto de arrastre
 versión animada, con arrastre, está en el historial de git hasta `0c54660`).
 
 Cambiar de pestaña con un vídeo abierto lo deja en miniplayer, que se queda visible
-sobre todas las pestañas.
+sobre todas las pestañas. Volver a la pestaña a la que pertenece lo vuelve a acoplar:
+en **TV en vivo** el canal regresa al hueco de arriba, sobre la guía de canales.
+
+### TV en vivo
+
+`LiveScreen` es la pestaña de TV lineal: reproductor fijo arriba (reserva el hueco y lo
+publica igual que el detalle) y guía de canales debajo. Tocar un canal lo pone en el
+hueco; el que suena queda resaltado. Cambiar de canal **sí** recrea el reproductor (el
+`key` de `VideoPlayer` es el índice); lo que nunca se recrea es al mover el vídeo entre
+el hueco y el miniplayer.
 
 Detalles que costaron una pasada de pruebas:
 

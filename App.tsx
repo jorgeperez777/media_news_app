@@ -4,8 +4,10 @@ import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 import PlayerHost from './components/PlayerHost';
 import TabBar, {type TabKey} from './components/TabBar';
 import {PlayerProvider, usePlayer} from './player/PlayerContext';
+import {isLive} from './sources';
 import DetailScreen from './screens/DetailScreen';
 import ListScreen from './screens/ListScreen';
+import LiveScreen from './screens/LiveScreen';
 import PlaceholderScreen from './screens/PlaceholderScreen';
 
 export default function App() {
@@ -29,8 +31,14 @@ function Main() {
   const [tab, setTab] = useState<TabKey>('videos');
 
   const showDetail =
-    tab === 'videos' && player.index !== null && player.mode === 'full';
+    tab === 'videos' &&
+    player.index !== null &&
+    !isLive(player.index) &&
+    player.mode === 'full';
   const immersive = player.fullscreen || player.pip;
+
+  /** Pestaña a la que pertenece lo que está abierto en el reproductor. */
+  const homeTab: TabKey = isLive(player.index) ? 'envivo' : 'videos';
 
   return (
     <View style={styles.root} ref={player.rootRef} collapsable={false}>
@@ -40,7 +48,9 @@ function Main() {
         // abajo manda la barra de pestañas, que ya aplica el inset inferior.
         edges={immersive ? [] : ['top', 'left', 'right']}>
         <StatusBar barStyle="light-content" />
-        {tab === 'videos' ? (
+        {tab === 'envivo' ? (
+          <LiveScreen />
+        ) : tab === 'videos' ? (
           showDetail ? (
             <DetailScreen />
           ) : (
@@ -55,10 +65,15 @@ function Main() {
         <TabBar
           active={tab}
           onChange={next => {
-            // Salir de la pestaña de vídeos con el reproductor abierto lo deja en
-            // miniplayer; si no, el vídeo taparía la pestaña nueva.
-            if (next !== 'videos' && player.index !== null) {
-              player.minimize();
+            if (player.index !== null) {
+              if (next !== homeTab) {
+                // Ir a una pestaña que no es la suya lo deja en miniplayer; si no,
+                // el vídeo taparía la pestaña nueva.
+                player.minimize();
+              } else if (next === 'envivo') {
+                // Volver a TV en vivo vuelve a acoplar el canal arriba.
+                player.expand();
+              }
             }
             setTab(next);
           }}

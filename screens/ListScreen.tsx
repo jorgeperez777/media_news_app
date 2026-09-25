@@ -1,6 +1,6 @@
 import React from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import SOURCES from '../sources';
+import {VOD_ITEMS} from '../sources';
 import {usePlayer} from '../player/PlayerContext';
 import {MINI_HEIGHT} from '../components/PlayerHost';
 import {TAB_BAR_HEIGHT} from '../components/TabBar';
@@ -25,14 +25,15 @@ export default function ListScreen() {
       ]}>
       <Text style={styles.heading}>Vídeos</Text>
       <Text style={styles.hint}>
-        Abre uno y pulsa ⌄ para dejarlo en el miniplayer; sigue reproduciéndose
-        mientras navegas por las pestañas.
+        Vídeos a la carta. Abre uno y pulsa ⌄ para dejarlo en el miniplayer; sigue
+        reproduciéndose mientras navegas por las pestañas. Los canales en directo
+        están en «TV en vivo».
       </Text>
 
-      {SOURCES.map((item, index) => (
+      {VOD_ITEMS.map(item => (
         <Pressable
           key={item.title}
-          onPress={() => player.open(index)}
+          onPress={() => player.open(item.index)}
           style={({pressed}) => [styles.row, pressed && styles.rowPressed]}>
           <View style={styles.thumb}>
             <PlayIcon size={22} />

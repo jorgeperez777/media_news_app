@@ -41,6 +41,9 @@ type PlayerApi = PlayerState & {
    * el reproductor acababa desplazado hacia arriba).
    */
   rootRef: React.RefObject<View | null>;
+  /** Vecinos dentro de la misma sección (canales con canales, vídeos con vídeos). */
+  previousIndex: number | null;
+  nextIndex: number | null;
   hasPrevious: boolean;
   hasNext: boolean;
 };
@@ -86,6 +89,21 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
     setError(null);
   }, []);
 
+  // ⏮/⏭ se mueven dentro de la sección del elemento actual: un canal en vivo no
+  // salta a un vídeo a la carta ni al contrario.
+  const neighbour = useCallback((from: number, step: number) => {
+    const kind = SOURCES[from].kind;
+    for (let i = from + step; i >= 0 && i < SOURCES.length; i += step) {
+      if (SOURCES[i].kind === kind) {
+        return i;
+      }
+    }
+    return null;
+  }, []);
+
+  const previousIndex = index === null ? null : neighbour(index, -1);
+  const nextIndex = index === null ? null : neighbour(index, 1);
+
   const value = useMemo<PlayerApi>(
     () => ({
       index,
@@ -106,10 +124,25 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
       setError,
       setAnchor,
       rootRef,
-      hasPrevious: index !== null && index > 0,
-      hasNext: index !== null && index < SOURCES.length - 1,
+      previousIndex,
+      nextIndex,
+      hasPrevious: previousIndex !== null,
+      hasNext: nextIndex !== null,
     }),
-    [index, mode, paused, fullscreen, pip, error, anchor, open, close, goTo],
+    [
+      index,
+      mode,
+      paused,
+      fullscreen,
+      pip,
+      error,
+      anchor,
+      open,
+      close,
+      goTo,
+      previousIndex,
+      nextIndex,
+    ],
   );
 
   return (

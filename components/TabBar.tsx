@@ -1,17 +1,23 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {PersonIcon, SearchIcon, VideoLibraryIcon} from './icons';
+import {
+  LiveTvIcon,
+  PersonIcon,
+  SearchIcon,
+  VideoLibraryIcon,
+} from './icons';
 
 export const TAB_BAR_HEIGHT = 56;
 
-export type TabKey = 'videos' | 'buscar' | 'perfil';
+export type TabKey = 'envivo' | 'videos' | 'buscar' | 'perfil';
 
 const TABS: Array<{
   key: TabKey;
   label: string;
   Icon: (props: {size?: number; color?: string}) => React.JSX.Element;
 }> = [
+  {key: 'envivo', label: 'TV en vivo', Icon: LiveTvIcon},
   {key: 'videos', label: 'Vídeos', Icon: VideoLibraryIcon},
   {key: 'buscar', label: 'Buscar', Icon: SearchIcon},
   {key: 'perfil', label: 'Perfil', Icon: PersonIcon},

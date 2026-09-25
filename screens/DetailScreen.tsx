@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import SOURCES from '../sources';
+import SOURCES, {VOD_ITEMS} from '../sources';
 import {usePlayer} from '../player/PlayerContext';
 
 /**
@@ -73,8 +73,8 @@ export default function DetailScreen() {
         <Text style={styles.hint}>
           Tap: mostrar/ocultar controles · Doble tap en los lados: ±10 s ·
           Arrastra la barra roja para buscar · ⏮ ⏭ cambian de vídeo (
-          {index + 1}/{SOURCES.length}) · ⌄ (junto al título) manda el vídeo al
-          miniplayer
+          {VOD_ITEMS.findIndex(item => item.index === index) + 1}/
+          {VOD_ITEMS.length}) · ⌄ (junto al título) manda el vídeo al miniplayer
         </Text>
         <View style={styles.actions}>
           <Pressable

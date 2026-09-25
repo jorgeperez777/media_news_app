@@ -2,7 +2,9 @@ import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import type {TabKey} from '../components/TabBar';
 
-const COPY: Record<Exclude<TabKey, 'videos'>, {title: string; body: string}> = {
+type PlaceholderTab = Exclude<TabKey, 'videos' | 'envivo'>;
+
+const COPY: Record<PlaceholderTab, {title: string; body: string}> = {
   buscar: {
     title: 'Buscar',
     body: 'Pestaña de ejemplo. Sirve para comprobar que el miniplayer sigue reproduciendo al cambiar de pestaña.',
@@ -13,7 +15,7 @@ const COPY: Record<Exclude<TabKey, 'videos'>, {title: string; body: string}> = {
   },
 };
 
-export default function PlaceholderScreen({tab}: {tab: Exclude<TabKey, 'videos'>}) {
+export default function PlaceholderScreen({tab}: {tab: PlaceholderTab}) {
   const {title, body} = COPY[tab];
   return (
     <View style={styles.container}>
