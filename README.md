@@ -112,11 +112,30 @@ geometría de Material Symbols: un viewBox 24×24 común, color y tamaño por pr
 | Botones centrales | ⏮ · ⟲10 · Play/Pause/Replay · ⟳10 · ⏭ (⏮/⏭ cuando hay lista, también en directo; en VOD ⏮ reinicia si llevas > 3 s, como YouTube) |
 | Fin del vídeo | Autoplay del siguiente de la lista (`autoplayNext`, por defecto `true`); sin siguiente, icono de Replay |
 | Barra roja inferior | Arrastrable (scrubbing) con buffer en gris; mini barra cuando los controles están ocultos |
-| ⚙ (arriba derecha) | Menú: **Calidad** (Auto + alturas disponibles, p. ej. 1080p/720p/480p, vía `onVideoTracks` + `selectedVideoTrack`; en iOS 15+ es un tope de resolución) y **Velocidad** 0.5x – 2x |
+| ⚙ (arriba derecha) | Menú: **Calidad** (Auto + alturas disponibles, p. ej. 1080p/720p/480p, vía `onVideoTracks` + `selectedVideoTrack`; en iOS 15+ es un tope de resolución), **Subtítulos** y **Velocidad** 0.5x – 2x |
+| CC (arriba derecha) | Enciende/apaga los subtítulos; solo aparece si el vídeo trae pistas. Azul = activos |
 | ⛶ (abajo derecha) | Pantalla completa: rota a horizontal, botón atrás sale |
 | Spinner | Mientras hace buffering |
 | ▭ (arriba derecha, junto a ⚙) | Picture in Picture manual; también entra solo al salir de la app (`enterPictureInPictureOnLeave`) |
 | Botón de cast / AirPlay (arriba derecha) | Envía el vídeo a un Chromecast o a AirPlay (ver [Chromecast y AirPlay](#chromecast-y-airplay)) |
+
+### Subtítulos
+
+Las pistas llegan en `onLoad` y en `onTextTracks`, y se eligen con
+`selectedTextTrack` (`{type: 'index', value}` o `{type: 'disabled'}`). El menú ⚙ las
+lista por título (o idioma), con «Desactivados» arriba; el botón CC es un atajo que
+alterna entre apagado y la última pista elegida. En Android los subtítulos se pintan
+dentro del vídeo, así que `subtitleStyle` los sube mientras los controles tapan la
+parte de abajo; en iOS los coloca el sistema.
+
+La fuente «Apple BipBop» de `sources.ts` trae ocho pistas (inglés, francés, español y
+japonés, cada una normal y forzada) para probarlo. También se pueden pasar pistas
+externas (.vtt, y .srt/.ttml solo en Android) en `source.textTracks`, pero en iOS eso
+desactiva AirPlay: es una limitación de AVPlayer.
+
+> Esto sacó un fallo de la librería: `getTextTrackInfo()` numera las pistas de forma
+> plana y `selectedTextTrack` por índice las buscaba dentro de cada grupo, así que en
+> HLS (un grupo por pista) solo funcionaba el índice 0. Arreglado en el fork.
 
 ### Directos (live)
 

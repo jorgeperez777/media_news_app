@@ -47,6 +47,16 @@ const SOURCES: Source[] = [
   },
   {
     kind: 'vod',
+    label: 'SUBS',
+    title: 'Apple BipBop (HLS con subtítulos)',
+    description:
+      'Trae varias pistas de subtítulos dentro del propio stream: botón CC y lista en ⚙.',
+    source: {
+      uri: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
+    },
+  },
+  {
+    kind: 'vod',
     // Para probar la recuperación de errores (el servidor responde 404).
     label: 'URL rota',
     title: 'URL inexistente (404)',

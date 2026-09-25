@@ -18,13 +18,16 @@ import Orientation from 'react-native-orientation-locker';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Video, {
   AirPlayButton,
+  SelectedTrackType,
   SelectedVideoTrackType,
   type OnBufferData,
   type OnExternalPlaybackChangeData,
   type OnLoadData,
   type OnProgressData,
+  type OnTextTracksData,
   type OnVideoErrorData,
   type OnVideoTracksData,
+  type TextTrack,
   type ReactVideoSource,
   type VideoRef,
   type VideoTrack,
@@ -43,6 +46,7 @@ import {
   ReplayIcon,
   SettingsIcon,
   SkipIcon,
+  SubtitlesIcon,
   TrackIcon,
 } from './icons';
 
@@ -170,10 +174,20 @@ export default function VideoPlayer({
   });
   const [controlsVisible, setControlsVisible] = useState(true);
   // Menú ⚙: principal → Calidad / Velocidad.
-  const [menu, setMenu] = useState<'main' | 'quality' | 'speed' | null>(null);
+  const [menu, setMenu] = useState<
+    'main' | 'quality' | 'speed' | 'subtitles' | null
+  >(null);
   // Calidad: 'auto' (ABR) o el alto en px de la variante elegida. Solo Android.
   const [videoTracks, setVideoTracks] = useState<VideoTrack[]>([]);
   const [quality, setQuality] = useState<'auto' | number>('auto');
+  // Subtítulos: pistas que anuncia el stream y la elegida ('off' = desactivados).
+  const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
+  const [subtitle, setSubtitle] = useState<'off' | number>('off');
+  // Última pista encendida, para que el botón CC la recupere al volver a activarlos.
+  const lastSubtitle = useRef<number | null>(null);
+  if (subtitle !== 'off') {
+    lastSubtitle.current = subtitle;
+  }
   const [scrubbing, setScrubbing] = useState(false);
   const [scrubTime, setScrubTime] = useState(0);
   const [skipHint, setSkipHint] = useState<{side: Side; seconds: number} | null>(null);
@@ -489,6 +503,9 @@ export default function VideoPlayer({
     if (data.videoTracks?.length) {
       setVideoTracks(data.videoTracks);
     }
+    if (data.textTracks?.length) {
+      setTextTracks(data.textTracks);
+    }
     // Cargó tras un reintento: reanudar donde estábamos (o al directo).
     if (playerKey > 0) {
       if (resumeToLiveRef.current || data.isLive) {
@@ -513,6 +530,7 @@ export default function VideoPlayer({
   };
 
   const onVideoTracks = (data: OnVideoTracksData) => setVideoTracks(data.videoTracks);
+  const onTextTracks = (data: OnTextTracksData) => setTextTracks(data.textTracks);
 
   const onProgress = (data: OnProgressData) => {
     currentTimeRef.current = data.currentTime;
@@ -571,6 +589,24 @@ export default function VideoPlayer({
       ? `Auto${playingHeight ? ` (${playingHeight}p)` : ''}`
       : `${q}p`;
   const speedLabel = (r: number) => (r === 1 ? 'Normal' : `${r}x`);
+  const trackLabel = (track: TextTrack) =>
+    track.title ?? track.language ?? `Pista ${track.index + 1}`;
+  const subtitleLabel = () => {
+    if (subtitle === 'off') {
+      return 'Desactivados';
+    }
+    const track = textTracks.find(t => t.index === subtitle);
+    return track ? trackLabel(track) : 'Desactivados';
+  };
+  // El botón CC alterna entre apagado y la última pista elegida (o la primera).
+  const toggleSubtitles = () => {
+    setSubtitle(current =>
+      current === 'off'
+        ? lastSubtitle.current ?? textTracks[0]?.index ?? 'off'
+        : 'off',
+    );
+    touch();
+  };
 
   // En directo la barra representa la ventana DVR (seekableDuration), no una duración fija.
   // Transmitiendo, la duración la da el receptor (en directo no hay DVR remoto).
@@ -602,6 +638,13 @@ export default function VideoPlayer({
     paddingBottom: insets.bottom,
     paddingLeft: insets.left,
     paddingRight: insets.right,
+  };
+
+  // Android: los subtítulos se pintan dentro del vídeo, así que hay que apartarlos
+  // de la barra inferior mientras los controles están a la vista (iOS los coloca solo).
+  const subtitleStyle = {
+    subtitlesFollowVideo: true,
+    paddingBottom: controlsVisible && !compact ? 56 : 12,
   };
 
   const containerStyle =
@@ -647,6 +690,15 @@ export default function VideoPlayer({
         onProgress={onProgress}
         onBuffer={onBuffer}
         onVideoTracks={onVideoTracks}
+        onTextTracks={onTextTracks}
+        selectedTextTrack={
+          subtitle === 'off'
+            ? {type: SelectedTrackType.DISABLED}
+            : {type: SelectedTrackType.INDEX, value: subtitle}
+        }
+        // Android dibuja los subtítulos dentro de la superficie: hay que subirlos
+        // cuando los controles tapan la parte de abajo (en iOS los coloca el sistema).
+        subtitleStyle={subtitleStyle}
         selectedVideoTrack={
           quality === 'auto'
             ? {type: SelectedVideoTrackType.AUTO}
@@ -798,6 +850,15 @@ export default function VideoPlayer({
               />
               {/* Chromecast: el botón nativo se oculta solo si no hay dispositivos. */}
               <CastButton style={styles.routeButton} tintColor="#fff" />
+              {/* CC: atajo para encender/apagar; la pista se elige en ⚙. */}
+              {!playerError && !casting && textTracks.length > 0 && (
+                <Pressable
+                  hitSlop={12}
+                  style={styles.iconButton}
+                  onPress={toggleSubtitles}>
+                  <SubtitlesIcon active={subtitle !== 'off'} />
+                </Pressable>
+              )}
               {!playerError && !casting && !airplay.active && (
                 <Pressable
                   hitSlop={12}
@@ -1018,6 +1079,18 @@ export default function VideoPlayer({
                 onPress={() => setMenu('quality')}
               />
               <MenuRow
+                label="Subtítulos"
+                value={
+                  casting
+                    ? 'No disponible al transmitir'
+                    : textTracks.length
+                    ? subtitleLabel()
+                    : 'No disponible'
+                }
+                disabled={casting || !textTracks.length}
+                onPress={() => setMenu('subtitles')}
+              />
+              <MenuRow
                 label="Velocidad de reproducción"
                 value={
                   casting
@@ -1042,6 +1115,33 @@ export default function VideoPlayer({
                   selected={q === quality}
                   onPress={() => {
                     setQuality(q);
+                    setMenu(null);
+                    touch();
+                  }}
+                />
+              ))}
+            </>
+          )}
+
+          {menu === 'subtitles' && (
+            <>
+              <MenuHeader title="Subtítulos" onBack={() => setMenu('main')} />
+              <MenuOption
+                label="Desactivados"
+                selected={subtitle === 'off'}
+                onPress={() => {
+                  setSubtitle('off');
+                  setMenu(null);
+                  touch();
+                }}
+              />
+              {textTracks.map(track => (
+                <MenuOption
+                  key={track.index}
+                  label={trackLabel(track)}
+                  selected={track.index === subtitle}
+                  onPress={() => {
+                    setSubtitle(track.index);
                     setMenu(null);
                     touch();
                   }}
