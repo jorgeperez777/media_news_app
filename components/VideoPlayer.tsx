@@ -314,12 +314,49 @@ export default function VideoPlayer({
     return unsubscribe;
   }, []);
 
-  // Chromecast: al conectar un dispositivo, el vídeo pasa al receptor y la
-  // reproducción local se pausa; al desconectar, se reanuda donde iba el receptor.
   const sourceUri =
     typeof source === 'object' && source !== null && 'uri' in source
       ? (source as {uri?: string}).uri
       : undefined;
+  // Cambiar de vídeo o de canal ya no remonta el reproductor (así ExoPlayer/AVPlayer
+  // no se recrean), así que hay que limpiar a mano lo que era del medio anterior.
+  // `firstSource` evita hacerlo en el primer render, donde no hay nada que limpiar.
+  const firstSource = useRef(true);
+  useEffect(() => {
+    if (firstSource.current) {
+      firstSource.current = false;
+      return;
+    }
+    setCurrentTime(0);
+    setDuration(0);
+    setBuffered(0);
+    setBuffering(true);
+    setEnded(false);
+    setIsLive(false);
+    setLiveOffset(-1);
+    setSeekableDuration(0);
+    setScrubbing(false);
+    setVideoTracks([]);
+    setQuality('auto');
+    setTextTracks([]);
+    setSubtitle('off');
+    lastSubtitle.current = null;
+    setPlayerError(null);
+    setRetryAttempt(0);
+    setRetryCountdown(null);
+    setMenu(null);
+    setControlsVisible(true);
+    resumeTimeRef.current = 0;
+    resumeToLiveRef.current = false;
+    currentTimeRef.current = 0;
+    if (retryTimer.current) {
+      clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+    }
+  }, [sourceUri]);
+
+  // Chromecast: al conectar un dispositivo, el vídeo pasa al receptor y la
+  // reproducción local se pausa; al desconectar, se reanuda donde iba el receptor.
   const cast = useCast({
     media: {url: sourceUri, title, isLive, duration},
     getLocalTime: () => currentTimeRef.current,

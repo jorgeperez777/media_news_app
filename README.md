@@ -80,9 +80,9 @@ en **TV en vivo** el canal regresa al hueco de arriba, sobre la guía de canales
 
 `LiveScreen` es la pestaña de TV lineal: reproductor fijo arriba (reserva el hueco y lo
 publica igual que el detalle) y guía de canales debajo. Tocar un canal lo pone en el
-hueco; el que suena queda resaltado. Cambiar de canal **sí** recrea el reproductor (el
-`key` de `VideoPlayer` es el índice); lo que nunca se recrea es al mover el vídeo entre
-el hueco y el miniplayer.
+hueco; el que suena queda resaltado. Cambiar de canal **no** recrea el reproductor:
+solo cambia la fuente (ver [Rendimiento](#rendimiento)), igual que al mover el vídeo
+entre el hueco y el miniplayer.
 
 Detalles que costaron una pasada de pruebas:
 
@@ -117,6 +117,23 @@ Lo que lo consigue:
   aviso de progreso re-renderiza el overlay entero, así que la cadencia manda.
 - `subtitleStyle` memoizado: sin eso, cada render mandaba una prop nueva a la vista nativa.
 - Miniaturas de 120 px y sprite dibujado a tamaño natural con `transform: scale`.
+
+### Cambiar de vídeo o de canal sin recrear el reproductor
+
+`PlayerHost` ya no le pone `key={index}` a `VideoPlayer`: cambiar de vídeo o de canal
+solo cambia la prop `source`, así que ni ExoPlayer/AVPlayer ni la vista nativa se
+recrean (`ExoPlayerImpl: Init`/`Release` = 0 al cambiar). A cambio, el componente ya no
+se desmonta y hay que limpiar a mano lo que era del medio anterior —tiempo, duración,
+pistas, subtítulos, calidad, error y reintentos—: lo hace un efecto sobre la URL de la
+fuente, en `VideoPlayer`.
+
+Lo que se nota: antes, un segundo después de tocar otro canal la superficie estaba
+**negra** con el spinner; ahora se queda el último fotograma del canal anterior hasta
+que llega el nuevo. El tiempo total hasta que suena el canal nuevo lo manda la red
+(0,4-2 s según el canal en el emulador), no el reproductor.
+
+Sigue habiendo un remontaje deliberado: el de los reintentos tras un error fatal
+(`playerKey`), porque ahí sí hace falta reinicializar el reproductor.
 
 Dos cosas que conviene no confundir al medir:
 

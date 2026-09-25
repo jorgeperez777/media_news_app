@@ -84,8 +84,9 @@ export default function PlayerHost() {
   return (
     <View style={[styles.host, containerStyle, isMini && styles.hostMini]}>
       <View style={videoStyle}>
+        {/* Sin `key`: cambiar de vídeo o de canal solo cambia la fuente, así el
+            reproductor nativo no se recrea (ver el reset en VideoPlayer). */}
         <VideoPlayer
-          key={index}
           source={current.source}
           title={current.title}
           style={styles.video}
