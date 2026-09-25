@@ -73,7 +73,7 @@ export default function DetailScreen() {
         <Text style={styles.hint}>
           Tap: mostrar/ocultar controles · Doble tap en los lados: ±10 s ·
           Arrastra la barra roja para buscar · ⏮ ⏭ cambian de vídeo (
-          {index + 1}/{SOURCES.length}) · Arrastra el vídeo hacia abajo para el
+          {index + 1}/{SOURCES.length}) · ⌄ (junto al título) manda el vídeo al
           miniplayer
         </Text>
         <View style={styles.actions}>

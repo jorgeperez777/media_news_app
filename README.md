@@ -43,7 +43,8 @@ yarn ios              # simulador iOS
 
 ```
 App.tsx ─ PlayerProvider (player/PlayerContext.tsx)
-          ├─ ListScreen / DetailScreen      ← las pantallas se intercambian
+          ├─ ListScreen / DetailScreen / PlaceholderScreen  ← según la pestaña
+          ├─ TabBar (components/TabBar.tsx)                 ← Vídeos · Buscar · Perfil
           └─ PlayerHost (components/PlayerHost.tsx)  ← el <VideoPlayer>, siempre montado
 ```
 
@@ -57,10 +58,17 @@ se anima es su geometría entre dos cajas:
 
 | | Expandido | Miniplayer |
 |---|---|---|
-| Geometría | El hueco que reserva `DetailScreen` (lo mide y lo publica en el contexto) | Barra de 72 px abajo, con el vídeo a la izquierda |
-| Minimizar | ⌄ a la izquierda del título (prop `onMinimize` de `VideoPlayer`), arrastre o botón Atrás | — |
+| Geometría | El hueco que reserva `DetailScreen` (lo mide y lo publica en el contexto) | Barra de 72 px justo encima de la barra de pestañas |
+| Minimizar | ⌄ a la izquierda del título (prop `onMinimize` de `VideoPlayer`), el botón "Minimizar" o Atrás | — |
 | Controles | Los de siempre (`VideoPlayer`) | `compact`: sin overlay; la barra pone título, ⏯ y ✕ |
-| Gestos | Arrastrar hacia abajo minimiza | Tocar expande · arrastrar hacia abajo cierra |
+| Volver | — | Tocar el título expande; ✕ cierra y libera el reproductor |
+
+El cambio entre los dos estados es **inmediato**: se pulsa el botón y la caja se
+redibuja ya en la barra de abajo, sin animación de colapso ni gesto de arrastre (la
+versión animada, con arrastre, está en el historial de git hasta `0c54660`).
+
+Cambiar de pestaña con un vídeo abierto lo deja en miniplayer, que se queda visible
+sobre todas las pestañas.
 
 Detalles que costaron una pasada de pruebas:
 

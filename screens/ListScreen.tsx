@@ -3,6 +3,7 @@ import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import SOURCES from '../sources';
 import {usePlayer} from '../player/PlayerContext';
 import {MINI_HEIGHT} from '../components/PlayerHost';
+import {TAB_BAR_HEIGHT} from '../components/TabBar';
 import {PlayIcon} from '../components/icons';
 
 /** Lista de vídeos. Tocar uno abre el detalle con el reproductor. */
@@ -15,12 +16,17 @@ export default function ListScreen() {
       // Deja sitio para el miniplayer cuando está abajo.
       contentContainerStyle={[
         styles.content,
-        player.index !== null && player.mode === 'mini' && {paddingBottom: MINI_HEIGHT + 16},
+        {
+          paddingBottom:
+            TAB_BAR_HEIGHT +
+            16 +
+            (player.index !== null && player.mode === 'mini' ? MINI_HEIGHT : 0),
+        },
       ]}>
       <Text style={styles.heading}>Vídeos</Text>
       <Text style={styles.hint}>
-        Abre uno y arrástralo hacia abajo para dejarlo en miniplayer; sigue
-        reproduciéndose mientras vuelves a la lista.
+        Abre uno y pulsa ⌄ para dejarlo en el miniplayer; sigue reproduciéndose
+        mientras navegas por las pestañas.
       </Text>
 
       {SOURCES.map((item, index) => (
