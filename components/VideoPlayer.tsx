@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   BackHandler,
+  Image,
   Modal,
   Pressable,
   StatusBar,
@@ -35,6 +36,7 @@ import Video, {
 import SeekBar from './SeekBar';
 import useCast from './useCast';
 import useNetworkCap, {mbps, type DataSaver} from './useNetworkCap';
+import useStoryboard, {type StoryboardSource} from './useStoryboard';
 import {
   AirPlayGlyph,
   CastIcon,
@@ -106,7 +108,13 @@ type Props = {
    */
   dataSaver?: DataSaver;
   onDataSaverChange?: (mode: DataSaver) => void;
+  /** Miniaturas para la vista previa de la barra (ver `useStoryboard`). */
+  storyboard?: StoryboardSource;
 };
+
+const BOTTOM_BAR_PADDING = 12;
+// Ancho en pantalla de la miniatura de la vista previa; el alto lo pone el sprite.
+const PREVIEW_WIDTH = 160;
 
 // ⏮ con más de este tiempo reproducido vuelve al inicio en vez de al anterior (como YouTube).
 const PREVIOUS_RESTART_THRESHOLD_S = 3;
@@ -138,6 +146,7 @@ export default function VideoPlayer({
   onPausedChange,
   dataSaver = 'auto',
   onDataSaverChange,
+  storyboard,
 }: Props) {
   const videoRef = useRef<VideoRef>(null);
   const insets = useSafeAreaInsets();
@@ -192,6 +201,9 @@ export default function VideoPlayer({
   // Tope de bitrate según la red (ver useNetworkCap) y última estimación de ancho
   // de banda que publica ExoPlayer (`reportBandwidth`, solo Android).
   const networkCap = useNetworkCap(dataSaver);
+  // Vista previa de la barra: recorte del storyboard para el instante arrastrado.
+  const tileAt = useStoryboard(storyboard);
+  const [layoutWidth, setLayoutWidth] = useState(0);
   const [bandwidth, setBandwidth] = useState(0);
   // Subtítulos: pistas que anuncia el stream y la elegida ('off' = desactivados).
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
@@ -659,6 +671,22 @@ export default function VideoPlayer({
     paddingRight: insets.right,
   };
 
+  // Vista previa: solo mientras se arrastra, en VOD y con storyboard. La barra
+  // ocupa el ancho del reproductor menos el padding de la barra inferior.
+  const previewTile = scrubbing && !isLive && !casting ? tileAt(scrubTime) : null;
+  // El sprite se escala para que la miniatura ocupe PREVIEW_WIDTH; el alto sale
+  // de su propia proporción (una variante 640x368 no da exactamente 16:9).
+  const previewScale = previewTile ? PREVIEW_WIDTH / previewTile.width : 1;
+  const barInset = fullscreen ? insets.left + insets.right : 0;
+  const barWidth = Math.max(1, layoutWidth - barInset - 2 * BOTTOM_BAR_PADDING);
+  const previewLeft = Math.min(
+    barWidth - PREVIEW_WIDTH / 2,
+    Math.max(
+      PREVIEW_WIDTH / 2,
+      (timelineDuration > 0 ? scrubTime / timelineDuration : 0) * barWidth,
+    ),
+  );
+
   // Android: los subtítulos se pintan dentro del vídeo, así que hay que apartarlos
   // de la barra inferior mientras los controles están a la vista (iOS los coloca solo).
   const subtitleStyle = {
@@ -676,6 +704,7 @@ export default function VideoPlayer({
       style={containerStyle}
       onLayout={e => {
         surfaceWidth.current = e.nativeEvent.layout.width || 1;
+        setLayoutWidth(e.nativeEvent.layout.width || 0);
       }}>
       <StatusBar hidden={fullscreen && !compact} />
 
@@ -849,7 +878,9 @@ export default function VideoPlayer({
           {!playerError && <View pointerEvents="none" style={styles.dim} />}
 
           {/* Barra superior */}
-          <View style={styles.topBar} pointerEvents="box-none">
+          <View
+            style={[styles.topBar, previewTile && styles.hidden]}
+            pointerEvents={previewTile ? 'none' : 'box-none'}>
             {/* ⌄ minimizar: solo cuando hay miniplayer y no estamos en pantalla completa. */}
             {onMinimize && !fullscreen && (
               <Pressable
@@ -911,7 +942,9 @@ export default function VideoPlayer({
           {/* Controles centrales. La fila siempre se renderiza (flex: 1 empuja la
               barra inferior al fondo); solo el botón de play se oculta mientras
               hace buffering, porque el spinner ocupa su sitio. */}
-          <View style={styles.centerRow} pointerEvents="box-none">
+          <View
+            style={[styles.centerRow, previewTile && styles.hidden]}
+            pointerEvents={previewTile ? 'none' : 'box-none'}>
             {!playerError && (
               <>
               {showTrackButtons && (
@@ -1022,6 +1055,29 @@ export default function VideoPlayer({
                 </Pressable>
               )}
             </View>
+            {previewTile && (
+              <View
+                pointerEvents="none"
+                style={[styles.preview, {left: previewLeft - PREVIEW_WIDTH / 2}]}>
+                <View
+                  style={[
+                    styles.previewFrame,
+                    {height: Math.round(previewTile.height * previewScale)},
+                  ]}>
+                  <Image
+                    source={previewTile.image}
+                    style={{
+                      width: previewTile.sheetWidth * previewScale,
+                      height: previewTile.sheetHeight * previewScale,
+                      marginLeft: -previewTile.x * previewScale,
+                      marginTop: -previewTile.y * previewScale,
+                    }}
+                  />
+                </View>
+                <Text style={styles.previewTime}>{formatTime(scrubTime)}</Text>
+              </View>
+            )}
+
             {hasDvr && !playerError ? (
               <SeekBar
                 currentTime={displayTime}
@@ -1426,7 +1482,28 @@ const styles = StyleSheet.create({
   },
   retryText: {color: '#000', fontWeight: '700'},
   bottomBar: {
-    paddingHorizontal: 12,
+    paddingHorizontal: BOTTOM_BAR_PADDING,
+  },
+  preview: {
+    position: 'absolute',
+    bottom: 44,
+    alignItems: 'center',
+    gap: 4,
+  },
+  previewFrame: {
+    width: PREVIEW_WIDTH,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: '#000',
+    overflow: 'hidden',
+  },
+  previewTime: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowRadius: 3,
   },
   bottomRow: {
     flexDirection: 'row',

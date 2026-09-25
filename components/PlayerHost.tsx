@@ -92,6 +92,7 @@ export default function PlayerHost() {
           compact={isMini}
           paused={player.paused}
           onPausedChange={player.setPaused}
+          storyboard={current.storyboard}
           dataSaver={player.dataSaver}
           onDataSaverChange={player.setDataSaver}
           onError={player.setError}

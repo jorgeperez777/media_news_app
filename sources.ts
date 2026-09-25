@@ -1,4 +1,6 @@
 // Fuentes de prueba públicas (verificadas con HTTP 200).
+import type {StoryboardSource} from './components/useStoryboard';
+
 export type Source = {
   /** 'live' sale en la pestaña TV en vivo; 'vod' en la lista de vídeos. */
   kind: 'live' | 'vod';
@@ -6,6 +8,8 @@ export type Source = {
   title: string;
   description: string;
   source: {uri: string};
+  /** Miniaturas para la vista previa de la barra (ver scripts/storyboard.swift). */
+  storyboard?: StoryboardSource;
 };
 
 const SOURCES: Source[] = [
@@ -42,8 +46,13 @@ const SOURCES: Source[] = [
     kind: 'vod',
     label: 'HLS',
     title: 'Big Buck Bunny (HLS)',
-    description: 'VOD multi-calidad: menú de calidades, velocidad y saltos de ±10 s.',
+    description:
+      'VOD multi-calidad: menú de calidades, velocidad, saltos de ±10 s y vista previa al arrastrar.',
     source: {uri: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'},
+    storyboard: {
+      image: require('./assets/storyboards/big-buck-bunny.jpg'),
+      index: require('./assets/storyboards/big-buck-bunny.json'),
+    },
   },
   {
     kind: 'vod',
@@ -67,9 +76,13 @@ const SOURCES: Source[] = [
     kind: 'vod',
     label: 'MP4',
     title: 'Big Buck Bunny (MP4 720p)',
-    description: 'MP4 progresivo: una sola calidad, sin menú.',
+    description: 'MP4 progresivo: una sola calidad, sin menú, con vista previa.',
     source: {
       uri: 'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4',
+    },
+    storyboard: {
+      image: require('./assets/storyboards/big-buck-bunny-mp4.jpg'),
+      index: require('./assets/storyboards/big-buck-bunny-mp4.json'),
     },
   },
 ];

@@ -112,12 +112,56 @@ geometría de Material Symbols: un viewBox 24×24 común, color y tamaño por pr
 | Botones centrales | ⏮ · ⟲10 · Play/Pause/Replay · ⟳10 · ⏭ (⏮/⏭ cuando hay lista, también en directo; en VOD ⏮ reinicia si llevas > 3 s, como YouTube) |
 | Fin del vídeo | Autoplay del siguiente de la lista (`autoplayNext`, por defecto `true`); sin siguiente, icono de Replay |
 | Barra roja inferior | Arrastrable (scrubbing) con buffer en gris; mini barra cuando los controles están ocultos |
+| Arrastrar la barra | Vista previa con miniatura y tiempo (ver [Vista previa](#vista-previa-en-la-barra-storyboard)); el resto de controles se aparta |
 | ⚙ (arriba derecha) | Menú: **Calidad** (Auto + alturas disponibles, p. ej. 1080p/720p/480p, vía `onVideoTracks` + `selectedVideoTrack`; en iOS 15+ es un tope de resolución), **Ahorro de datos**, **Subtítulos** y **Velocidad** 0.5x – 2x |
 | CC (arriba derecha) | Enciende/apaga los subtítulos; solo aparece si el vídeo trae pistas. Azul = activos |
 | ⛶ (abajo derecha) | Pantalla completa: rota a horizontal, botón atrás sale |
 | Spinner | Mientras hace buffering |
 | ▭ (arriba derecha, junto a ⚙) | Picture in Picture manual; también entra solo al salir de la app (`enterPictureInPictureOnLeave`) |
 | Botón de cast / AirPlay (arriba derecha) | Envía el vídeo a un Chromecast o a AirPlay (ver [Chromecast y AirPlay](#chromecast-y-airplay)) |
+
+### Vista previa en la barra (storyboard)
+
+Al arrastrar la barra sale la miniatura del instante, como en YouTube. No se sacan
+fotogramas del vídeo al vuelo (lento, y en HLS acaba compitiendo por ancho de banda y
+decodificadores): se usa un **storyboard**, una imagen-mosaico con una miniatura cada
+5 s más un índice, y solo se recorta.
+
+`components/useStoryboard.ts` admite las dos formas de dar ese índice:
+
+```ts
+// 1. Sprite empaquetado con la app (lo que usa sources.ts).
+storyboard: {
+  image: require('./assets/storyboards/big-buck-bunny.jpg'),
+  index: require('./assets/storyboards/big-buck-bunny.json'),
+}
+
+// 2. WebVTT de miniaturas, que es lo que sirven los empaquetadores:
+//    cada cue apunta a `sprite.jpg#xywh=x,y,w,h`.
+storyboard: {vttUri: 'https://cdn.example.com/bbb/storyboard.vtt'}
+```
+
+Los sprites se generan con `scripts/storyboard.swift`, que escribe el .jpg, el .json y
+el .vtt equivalente:
+
+```sh
+swift scripts/storyboard.swift \
+  https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8 \
+  assets/storyboards/big-buck-bunny 5 160
+```
+
+Dos cosas del generador que conviene saber:
+
+- Usa AVFoundation, que **no saca fotogramas de un HLS remoto** («The operation could
+  not be completed»). Por eso, ante un `.m3u8`, el script baja la variante más ligera
+  a un fichero temporal y trabaja sobre él; para miniaturas de 160 px sobra.
+- En Linux/CI el equivalente es ffmpeg, y el índice se escribe a mano:
+  `ffmpeg -i entrada.m3u8 -vf "fps=1/5,scale=160:-1,tile=12x11" -frames:v 1 salida.jpg`
+
+La vista previa solo aparece en VOD con storyboard: en directo no tiene sentido (habría
+que generar los sprites en continuo desde el servidor) y al transmitir manda el receptor.
+El polyfill de `URL` de React Native concatena base y ruta sin quitar el nombre de
+fichero, así que la URL del sprite se resuelve a mano en `useStoryboard`.
 
 ### Calidad y ahorro de datos
 
