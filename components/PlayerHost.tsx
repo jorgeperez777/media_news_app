@@ -92,6 +92,8 @@ export default function PlayerHost() {
           compact={isMini}
           paused={player.paused}
           onPausedChange={player.setPaused}
+          dataSaver={player.dataSaver}
+          onDataSaverChange={player.setDataSaver}
           onError={player.setError}
           onFullscreenChange={player.setFullscreen}
           onPipChange={player.setPip}

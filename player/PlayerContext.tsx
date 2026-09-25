@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import type {View} from 'react-native';
 import SOURCES from '../sources';
+import type {DataSaver} from '../components/useNetworkCap';
 
 /** Caja (en coordenadas de ventana) donde debe verse el reproductor expandido. */
 export type Anchor = {x: number; y: number; width: number; height: number};
@@ -22,6 +23,8 @@ type PlayerState = {
   pip: boolean;
   error: string | null;
   anchor: Anchor | null;
+  /** Ahorro de datos; vive aquí para no perderse al cambiar de vídeo. */
+  dataSaver: DataSaver;
 };
 
 type PlayerApi = PlayerState & {
@@ -35,6 +38,7 @@ type PlayerApi = PlayerState & {
   setPip: (pip: boolean) => void;
   setError: (error: string | null) => void;
   setAnchor: (anchor: Anchor | null) => void;
+  setDataSaver: (mode: DataSaver) => void;
   /**
    * Vista raíz de la app. El hueco del detalle se mide respecto a ella (no con
    * measureInWindow: en Android sus coordenadas no incluyen la barra de estado y
@@ -67,6 +71,7 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
   const [pip, setPip] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
+  const [dataSaver, setDataSaver] = useState<DataSaver>('auto');
   const rootRef = useRef<View | null>(null);
 
   const open = useCallback((next: number) => {
@@ -113,6 +118,7 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
       pip,
       error,
       anchor,
+      dataSaver,
       open,
       close,
       minimize: () => setMode('mini'),
@@ -123,6 +129,7 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
       setPip,
       setError,
       setAnchor,
+      setDataSaver,
       rootRef,
       previousIndex,
       nextIndex,
@@ -140,6 +147,7 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
       open,
       close,
       goTo,
+      dataSaver,
       previousIndex,
       nextIndex,
     ],

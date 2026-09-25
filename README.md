@@ -112,12 +112,45 @@ geometría de Material Symbols: un viewBox 24×24 común, color y tamaño por pr
 | Botones centrales | ⏮ · ⟲10 · Play/Pause/Replay · ⟳10 · ⏭ (⏮/⏭ cuando hay lista, también en directo; en VOD ⏮ reinicia si llevas > 3 s, como YouTube) |
 | Fin del vídeo | Autoplay del siguiente de la lista (`autoplayNext`, por defecto `true`); sin siguiente, icono de Replay |
 | Barra roja inferior | Arrastrable (scrubbing) con buffer en gris; mini barra cuando los controles están ocultos |
-| ⚙ (arriba derecha) | Menú: **Calidad** (Auto + alturas disponibles, p. ej. 1080p/720p/480p, vía `onVideoTracks` + `selectedVideoTrack`; en iOS 15+ es un tope de resolución), **Subtítulos** y **Velocidad** 0.5x – 2x |
+| ⚙ (arriba derecha) | Menú: **Calidad** (Auto + alturas disponibles, p. ej. 1080p/720p/480p, vía `onVideoTracks` + `selectedVideoTrack`; en iOS 15+ es un tope de resolución), **Ahorro de datos**, **Subtítulos** y **Velocidad** 0.5x – 2x |
 | CC (arriba derecha) | Enciende/apaga los subtítulos; solo aparece si el vídeo trae pistas. Azul = activos |
 | ⛶ (abajo derecha) | Pantalla completa: rota a horizontal, botón atrás sale |
 | Spinner | Mientras hace buffering |
 | ▭ (arriba derecha, junto a ⚙) | Picture in Picture manual; también entra solo al salir de la app (`enterPictureInPictureOnLeave`) |
 | Botón de cast / AirPlay (arriba derecha) | Envía el vídeo a un Chromecast o a AirPlay (ver [Chromecast y AirPlay](#chromecast-y-airplay)) |
+
+### Calidad y ahorro de datos
+
+Con HLS multi-calidad, quien cambia de calidad es el ABR del reproductor (ExoPlayer
+en Android, AVPlayer en iOS): mide el ancho de banda real y sube o baja de variante
+solo. Lo que añade la app encima es un **tope por tipo de red**, que es lo que hace
+YouTube con los datos móviles:
+
+| Red | Tope (`maxBitRate`) |
+|---|---|
+| Wi-Fi o cable | sin tope |
+| Móvil 4G/5G | 2,5 Mb/s (~720p) |
+| Móvil 3G | 0,8 Mb/s (~360p) |
+| Móvil 2G | 0,4 Mb/s (~240p) |
+
+`components/useNetworkCap.ts` traduce el estado de NetInfo (`type`,
+`cellularGeneration`, `isConnectionExpensive`) a ese tope, y el modo se elige en ⚙ →
+**Ahorro de datos**: *Automático* (la tabla), *Siempre activado* (0,8 Mb/s en
+cualquier red) o *Desactivado*. El tope **solo se aplica con calidad automática**: si
+eliges una resolución a mano, manda tu elección y la fila lo dice («sin efecto:
+calidad fija»).
+
+Detalles que conviene tener presentes:
+
+- El tope limita el gasto, no mejora la fluidez: para eso ya está el ABR, que mide el
+  rendimiento real en vez de fiarse de la etiqueta «cellular».
+- `maxBitRate` se aplica en caliente, sin remontar el reproductor ni cortar el vídeo
+  (en iOS es `preferredPeakBitRate`; en Android, `0` significa «sin tope»).
+- `reportBandwidth` + `onBandwidthUpdate` dan la estimación de ancho de banda que se
+  ve bajo la cabecera del menú de Calidad. **Solo Android**.
+- El modo vive en `PlayerContext` para que sobreviva al cambio de vídeo (que remonta
+  `VideoPlayer`), pero **no se guarda entre arranques**: eso necesitaría
+  `@react-native-async-storage/async-storage`.
 
 ### Subtítulos
 

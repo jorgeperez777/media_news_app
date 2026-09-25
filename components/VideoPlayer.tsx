@@ -34,6 +34,7 @@ import Video, {
 } from 'react-native-video';
 import SeekBar from './SeekBar';
 import useCast from './useCast';
+import useNetworkCap, {mbps, type DataSaver} from './useNetworkCap';
 import {
   AirPlayGlyph,
   CastIcon,
@@ -99,6 +100,12 @@ type Props = {
    */
   paused?: boolean;
   onPausedChange?: (paused: boolean) => void;
+  /**
+   * Ahorro de datos. Vive fuera del reproductor para que la elección sobreviva al
+   * cambio de vídeo (que remonta este componente).
+   */
+  dataSaver?: DataSaver;
+  onDataSaverChange?: (mode: DataSaver) => void;
 };
 
 // ⏮ con más de este tiempo reproducido vuelve al inicio en vez de al anterior (como YouTube).
@@ -129,6 +136,8 @@ export default function VideoPlayer({
   compact = false,
   paused: pausedProp,
   onPausedChange,
+  dataSaver = 'auto',
+  onDataSaverChange,
 }: Props) {
   const videoRef = useRef<VideoRef>(null);
   const insets = useSafeAreaInsets();
@@ -175,11 +184,15 @@ export default function VideoPlayer({
   const [controlsVisible, setControlsVisible] = useState(true);
   // Menú ⚙: principal → Calidad / Velocidad.
   const [menu, setMenu] = useState<
-    'main' | 'quality' | 'speed' | 'subtitles' | null
+    'main' | 'quality' | 'speed' | 'subtitles' | 'saver' | null
   >(null);
   // Calidad: 'auto' (ABR) o el alto en px de la variante elegida. Solo Android.
   const [videoTracks, setVideoTracks] = useState<VideoTrack[]>([]);
   const [quality, setQuality] = useState<'auto' | number>('auto');
+  // Tope de bitrate según la red (ver useNetworkCap) y última estimación de ancho
+  // de banda que publica ExoPlayer (`reportBandwidth`, solo Android).
+  const networkCap = useNetworkCap(dataSaver);
+  const [bandwidth, setBandwidth] = useState(0);
   // Subtítulos: pistas que anuncia el stream y la elegida ('off' = desactivados).
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
   const [subtitle, setSubtitle] = useState<'off' | number>('off');
@@ -589,6 +602,12 @@ export default function VideoPlayer({
       ? `Auto${playingHeight ? ` (${playingHeight}p)` : ''}`
       : `${q}p`;
   const speedLabel = (r: number) => (r === 1 ? 'Normal' : `${r}x`);
+  const saverLabel = (mode: DataSaver) =>
+    mode === 'auto'
+      ? 'Automático'
+      : mode === 'on'
+      ? 'Siempre activado'
+      : 'Desactivado';
   const trackLabel = (track: TextTrack) =>
     track.title ?? track.language ?? `Pista ${track.index + 1}`;
   const subtitleLabel = () => {
@@ -691,6 +710,11 @@ export default function VideoPlayer({
         onBuffer={onBuffer}
         onVideoTracks={onVideoTracks}
         onTextTracks={onTextTracks}
+        // Tope de datos: solo manda con calidad automática; si el usuario ha fijado
+        // una resolución a mano, su elección gana. 0 = sin tope.
+        maxBitRate={quality === 'auto' ? networkCap.bitrate : 0}
+        reportBandwidth
+        onBandwidthUpdate={e => setBandwidth(e.bitrate ?? 0)}
         selectedTextTrack={
           subtitle === 'off'
             ? {type: SelectedTrackType.DISABLED}
@@ -1079,6 +1103,20 @@ export default function VideoPlayer({
                 onPress={() => setMenu('quality')}
               />
               <MenuRow
+                label="Ahorro de datos"
+                value={
+                  casting
+                    ? 'No disponible al transmitir'
+                    : quality !== 'auto'
+                    ? `${saverLabel(dataSaver)} · sin efecto: calidad fija`
+                    : `${saverLabel(dataSaver)} · ${networkCap.network}: ${
+                        networkCap.limit
+                      }`
+                }
+                disabled={casting}
+                onPress={() => setMenu('saver')}
+              />
+              <MenuRow
                 label="Subtítulos"
                 value={
                   casting
@@ -1108,6 +1146,10 @@ export default function VideoPlayer({
           {menu === 'quality' && (
             <>
               <MenuHeader title="Calidad" onBack={() => setMenu('main')} />
+              <Text style={styles.menuNote}>
+                {networkCap.network}: {networkCap.limit}
+                {bandwidth > 0 ? ` · red estimada en ${mbps(bandwidth)}` : ''}
+              </Text>
               {(['auto', ...qualityOptions] as Array<'auto' | number>).map(q => (
                 <MenuOption
                   key={q}
@@ -1115,6 +1157,29 @@ export default function VideoPlayer({
                   selected={q === quality}
                   onPress={() => {
                     setQuality(q);
+                    setMenu(null);
+                    touch();
+                  }}
+                />
+              ))}
+            </>
+          )}
+
+          {menu === 'saver' && (
+            <>
+              <MenuHeader title="Ahorro de datos" onBack={() => setMenu('main')} />
+              <Text style={styles.menuNote}>
+                Limita el bitrate cuando no estás en Wi-Fi. La calidad sigue
+                ajustándose sola por debajo del tope, y no se aplica si eliges una
+                resolución a mano.
+              </Text>
+              {(['auto', 'on', 'off'] as DataSaver[]).map(mode => (
+                <MenuOption
+                  key={mode}
+                  label={saverLabel(mode)}
+                  selected={mode === dataSaver}
+                  onPress={() => {
+                    onDataSaverChange?.(mode);
                     setMenu(null);
                     touch();
                   }}
@@ -1191,8 +1256,12 @@ function MenuRow({
       disabled={disabled}
       style={[styles.menuItem, disabled && styles.dimmed]}
       onPress={onPress}>
-      <Text style={styles.menuItemText}>{label}</Text>
-      <Text style={styles.menuItemValue}>{value} ›</Text>
+      <Text style={styles.menuItemText} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={styles.menuItemValue} numberOfLines={1}>
+        {value} ›
+      </Text>
     </Pressable>
   );
 }
@@ -1445,13 +1514,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  menuItemValue: {color: 'rgba(255,255,255,0.6)', fontSize: 14},
+  menuItemValue: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    flexShrink: 1,
+    marginLeft: 12,
+    textAlign: 'right',
+  },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  menuNote: {
+    color: '#aaa',
+    fontSize: 12,
+    lineHeight: 17,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
   },
   menuItemText: {color: '#fff', fontSize: 15},
   menuItemActive: {fontWeight: '700'},
