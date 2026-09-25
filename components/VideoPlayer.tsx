@@ -208,12 +208,27 @@ export default function VideoPlayer({
 
   // Auto-ocultar mientras reproduce y no hay interacción en curso.
   useEffect(() => {
-    if (!controlsVisible || paused || scrubbing || menu || buffering) {
+    if (
+      !controlsVisible ||
+      paused ||
+      scrubbing ||
+      menu ||
+      buffering ||
+      playerError
+    ) {
       return;
     }
     const t = setTimeout(() => setControlsVisible(false), AUTO_HIDE_MS);
     return () => clearTimeout(t);
-  }, [controlsVisible, paused, scrubbing, menu, buffering, interaction]);
+  }, [
+    controlsVisible,
+    paused,
+    scrubbing,
+    menu,
+    buffering,
+    playerError,
+    interaction,
+  ]);
 
   // Fullscreen: rota a horizontal, avisa al padre y el botón atrás de Android sale.
   useEffect(() => {
@@ -493,7 +508,7 @@ export default function VideoPlayer({
     resumeToLiveRef.current = isLive && atLiveEdge;
     setBuffering(false);
     setPlayerError(message);
-    setControlsVisible(false);
+    setControlsVisible(true);
     onError?.(message);
   };
 
@@ -722,31 +737,6 @@ export default function VideoPlayer({
       {/* Error con reintento */}
       {playerError && (
         <View style={styles.errorOverlay}>
-          {/* Salida de emergencia: con un error los controles no se dibujan, así que
-              este es el único botón para dejar la pantalla completa (o bajar al
-              miniplayer). En iOS no hay botón Atrás con el que escapar. */}
-          {(fullscreen || onMinimize) && !pipActive && (
-            <View
-              pointerEvents="box-none"
-              style={[styles.errorEscape, fullscreen && controlsInsets]}>
-              <Pressable
-                hitSlop={12}
-                style={styles.iconButton}
-                onPress={() => {
-                  if (fullscreen) {
-                    setFullscreen(false);
-                  } else {
-                    onMinimize?.();
-                  }
-                }}>
-                {fullscreen ? (
-                  <FullscreenIcon exit />
-                ) : (
-                  <ChevronIcon direction="down" />
-                )}
-              </Pressable>
-            </View>
-          )}
           <Text style={styles.errorTitle}>
             {online ? 'No se pudo reproducir el vídeo' : 'Sin conexión a internet'}
           </Text>
@@ -775,11 +765,12 @@ export default function VideoPlayer({
         </View>
       )}
 
-      {controlsVisible && !playerError && !pipActive && (
+      {controlsVisible && !pipActive && (
         <View
           style={[StyleSheet.absoluteFill, fullscreen && controlsInsets]}
           pointerEvents="box-none">
-          <View pointerEvents="none" style={styles.dim} />
+          {/* El overlay de error ya oscurece el fondo. */}
+          {!playerError && <View pointerEvents="none" style={styles.dim} />}
 
           {/* Barra superior */}
           <View style={styles.topBar} pointerEvents="box-none">
@@ -807,7 +798,7 @@ export default function VideoPlayer({
               />
               {/* Chromecast: el botón nativo se oculta solo si no hay dispositivos. */}
               <CastButton style={styles.routeButton} tintColor="#fff" />
-              {!casting && !airplay.active && (
+              {!playerError && !casting && !airplay.active && (
                 <Pressable
                   hitSlop={12}
                   style={styles.iconButton}
@@ -818,15 +809,17 @@ export default function VideoPlayer({
                   <PipIcon />
                 </Pressable>
               )}
-              <Pressable
-                hitSlop={12}
-                style={styles.iconButton}
-                onPress={() => {
-                  setMenu('main');
-                  touch();
-                }}>
-                <SettingsIcon />
-              </Pressable>
+              {!playerError && (
+                <Pressable
+                  hitSlop={12}
+                  style={styles.iconButton}
+                  onPress={() => {
+                    setMenu('main');
+                    touch();
+                  }}>
+                  <SettingsIcon />
+                </Pressable>
+              )}
             </View>
           </View>
 
@@ -834,76 +827,84 @@ export default function VideoPlayer({
               barra inferior al fondo); solo el botón de play se oculta mientras
               hace buffering, porque el spinner ocupa su sitio. */}
           <View style={styles.centerRow} pointerEvents="box-none">
-            {showTrackButtons && (
-              <Pressable
-                hitSlop={12}
-                style={[
-                  styles.iconButton,
-                  !hasPrevious &&
-                    (isLive || currentTime <= PREVIOUS_RESTART_THRESHOLD_S) &&
-                    styles.dimmed,
-                ]}
-                disabled={isLive && !hasPrevious}
-                onPress={goPrevious}>
-                <TrackIcon direction="previous" />
-              </Pressable>
-            )}
-            <Pressable
-              hitSlop={12}
-              style={[styles.iconButton, !canSkip && styles.hidden]}
-              disabled={!canSkip}
-              onPress={() => skip('left', false)}>
-              <SkipIcon direction="back" seconds={SKIP_SECONDS} />
-            </Pressable>
-            <Pressable
-              hitSlop={12}
-              style={[styles.playButton, uiBuffering && styles.hidden]}
-              disabled={uiBuffering}
-              onPress={togglePlay}>
-              {ended && !casting ? (
-                <ReplayIcon size={40} />
-              ) : uiPaused ? (
-                <PlayIcon size={34} />
-              ) : (
-                <PauseIcon size={34} />
+            {!playerError && (
+              <>
+              {showTrackButtons && (
+                <Pressable
+                  hitSlop={12}
+                  style={[
+                    styles.iconButton,
+                    !hasPrevious &&
+                      (isLive || currentTime <= PREVIOUS_RESTART_THRESHOLD_S) &&
+                      styles.dimmed,
+                  ]}
+                  disabled={isLive && !hasPrevious}
+                  onPress={goPrevious}>
+                  <TrackIcon direction="previous" />
+                </Pressable>
               )}
-            </Pressable>
-            <Pressable
-              hitSlop={12}
-              style={[styles.iconButton, !canSkip && styles.hidden]}
-              disabled={!canSkip}
-              onPress={() => skip('right', false)}>
-              <SkipIcon direction="forward" seconds={SKIP_SECONDS} />
-            </Pressable>
-            {showTrackButtons && (
               <Pressable
                 hitSlop={12}
-                style={[styles.iconButton, !hasNext && styles.dimmed]}
-                disabled={!hasNext}
-                onPress={() => {
-                  onNext?.();
-                  touch();
-                }}>
-                <TrackIcon direction="next" />
+                style={[styles.iconButton, !canSkip && styles.hidden]}
+                disabled={!canSkip}
+                onPress={() => skip('left', false)}>
+                <SkipIcon direction="back" seconds={SKIP_SECONDS} />
               </Pressable>
-            )}
-            {casting && (
               <Pressable
                 hitSlop={12}
-                style={styles.iconButton}
-                onPress={() => {
-                  cast.stop();
-                  touch();
-                }}>
-                <StopIcon size={22} />
+                style={[styles.playButton, uiBuffering && styles.hidden]}
+                disabled={uiBuffering}
+                onPress={togglePlay}>
+                {ended && !casting ? (
+                  <ReplayIcon size={40} />
+                ) : uiPaused ? (
+                  <PlayIcon size={34} />
+                ) : (
+                  <PauseIcon size={34} />
+                )}
               </Pressable>
+              <Pressable
+                hitSlop={12}
+                style={[styles.iconButton, !canSkip && styles.hidden]}
+                disabled={!canSkip}
+                onPress={() => skip('right', false)}>
+                <SkipIcon direction="forward" seconds={SKIP_SECONDS} />
+              </Pressable>
+              {showTrackButtons && (
+                <Pressable
+                  hitSlop={12}
+                  style={[styles.iconButton, !hasNext && styles.dimmed]}
+                  disabled={!hasNext}
+                  onPress={() => {
+                    onNext?.();
+                    touch();
+                  }}>
+                  <TrackIcon direction="next" />
+                </Pressable>
+              )}
+              {casting && (
+                <Pressable
+                  hitSlop={12}
+                  style={styles.iconButton}
+                  onPress={() => {
+                    cast.stop();
+                    touch();
+                  }}>
+                  <StopIcon size={22} />
+                </Pressable>
+              )}
+              </>
             )}
           </View>
 
           {/* Barra inferior */}
           <View style={styles.bottomBar} pointerEvents="box-none">
             <View style={styles.bottomRow} pointerEvents="box-none">
-              {isLive ? (
+              {/* Con error no hay tiempo ni badge, pero el hueco se mantiene para
+                  que ⤢ siga a la derecha. */}
+              {playerError ? (
+                <View />
+              ) : isLive ? (
                 <View style={styles.liveRow} pointerEvents="box-none">
                   {/* Rojo en directo; gris cuando vas atrasado (tap = volver al directo) */}
                   <Pressable
@@ -936,7 +937,7 @@ export default function VideoPlayer({
                 </Pressable>
               )}
             </View>
-            {hasDvr ? (
+            {hasDvr && !playerError ? (
               <SeekBar
                 currentTime={displayTime}
                 duration={timelineDuration}
@@ -1244,14 +1245,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     gap: 8,
-  },
-  errorEscape: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
   },
   errorTitle: {color: '#fff', fontSize: 16, fontWeight: '700', textAlign: 'center'},
   errorDetail: {color: 'rgba(255,255,255,0.7)', fontSize: 12, textAlign: 'center'},
