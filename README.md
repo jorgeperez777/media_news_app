@@ -98,6 +98,34 @@ Detalles que costaron una pasada de pruebas:
 No hay `react-navigation`: las pantallas se intercambian con estado. Si se añade, el host
 se queda igual, fuera del navigator.
 
+## Rendimiento
+
+Medido en el emulador con build de **debug** (en release y en dispositivo real mejora;
+el vídeo va por `SurfaceView`, así que sus fotogramas no pasan por el toolkit de UI):
+
+| | Antes | Ahora |
+|---|---|---|
+| Renders de JS reproduciendo, controles ocultos | 4,3/s | 1,2/s |
+| Frames de UI en 20 s, controles ocultos | 68 | 24 |
+| CPU del proceso | 11-12 % | 8 % |
+| Native heap al mostrar la vista previa | 11,5 MB | 7,8 MB |
+
+Lo que lo consigue:
+
+- `progressUpdateInterval` pasa a 1 s cuando los controles están ocultos (lo único que
+  se mueve entonces es la barra fina) y vuelve a 250 ms al mostrarlos o arrastrar. Cada
+  aviso de progreso re-renderiza el overlay entero, así que la cadencia manda.
+- `subtitleStyle` memoizado: sin eso, cada render mandaba una prop nueva a la vista nativa.
+- Miniaturas de 120 px y sprite dibujado a tamaño natural con `transform: scale`.
+
+Dos cosas que conviene no confundir al medir:
+
+- Al soltar la barra, el native heap sube ~13 MB **por el seek** (ExoPlayer rellena
+  buffers), no por la miniatura. Para medir la vista previa hay que mirar con el dedo
+  aún puesto.
+- `gfxinfo` marca como *janky* el 50 % de los frames, pero con 1-4 fps de UI son frames
+  aislados que pasan de 16 ms al despertar; el dato útil es el p95 (17-32 ms).
+
 ## Controles estilo YouTube
 
 `components/VideoPlayer.tsx` envuelve `<Video controls={false}>` con un overlay
@@ -147,7 +175,7 @@ el .vtt equivalente:
 ```sh
 swift scripts/storyboard.swift \
   https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8 \
-  assets/storyboards/big-buck-bunny 5 160
+  assets/storyboards/big-buck-bunny 5 120
 ```
 
 Dos cosas del generador que conviene saber:
@@ -157,6 +185,12 @@ Dos cosas del generador que conviene saber:
   a un fichero temporal y trabaja sobre él; para miniaturas de 160 px sobra.
 - En Linux/CI el equivalente es ffmpeg, y el índice se escribe a mano:
   `ffmpeg -i entrada.m3u8 -vf "fps=1/5,scale=160:-1,tile=12x11" -frames:v 1 salida.jpg`
+
+El sprite se dibuja a su tamaño natural en píxeles (dividido por `PixelRatio`) y se
+amplía con un `transform: scale`: así el bitmap se decodifica al tamaño del fichero y
+no al de la vista, que en pantallas densas multiplica la memoria. Con miniaturas de
+120 px, tener la vista previa en pantalla cuesta **7,8 MB** de native heap (antes, con
+160 px y sin el transform, 11,5 MB).
 
 La vista previa solo aparece en VOD con storyboard: en directo no tiene sentido (habría
 que generar los sprites en continuo desde el servidor) y al transmitir manda el receptor.

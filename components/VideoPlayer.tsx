@@ -1,9 +1,10 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   BackHandler,
   Image,
   Modal,
+  PixelRatio,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -674,9 +675,16 @@ export default function VideoPlayer({
   // Vista previa: solo mientras se arrastra, en VOD y con storyboard. La barra
   // ocupa el ancho del reproductor menos el padding de la barra inferior.
   const previewTile = scrubbing && !isLive && !casting ? tileAt(scrubTime) : null;
-  // El sprite se escala para que la miniatura ocupe PREVIEW_WIDTH; el alto sale
-  // de su propia proporción (una variante 640x368 no da exactamente 16:9).
-  const previewScale = previewTile ? PREVIEW_WIDTH / previewTile.width : 1;
+  // El sprite se dibuja a su tamaño natural en píxeles (dividiendo por la densidad)
+  // y se amplía con un transform: así el bitmap se decodifica una sola vez y al
+  // tamaño real del fichero, en vez de al de la vista, que en pantallas densas
+  // multiplicaba la memoria. El aumento lo hace la GPU al pintar.
+  const density = PixelRatio.get();
+  const previewNaturalWidth = previewTile ? previewTile.width / density : 0;
+  const previewNaturalHeight = previewTile ? previewTile.height / density : 0;
+  const previewScale = previewNaturalWidth
+    ? PREVIEW_WIDTH / previewNaturalWidth
+    : 1;
   const barInset = fullscreen ? insets.left + insets.right : 0;
   const barWidth = Math.max(1, layoutWidth - barInset - 2 * BOTTOM_BAR_PADDING);
   const previewLeft = Math.min(
@@ -689,10 +697,14 @@ export default function VideoPlayer({
 
   // Android: los subtítulos se pintan dentro del vídeo, así que hay que apartarlos
   // de la barra inferior mientras los controles están a la vista (iOS los coloca solo).
-  const subtitleStyle = {
-    subtitlesFollowVideo: true,
-    paddingBottom: controlsVisible && !compact ? 56 : 12,
-  };
+  // Memoizado: si no, cada render manda una prop nueva a la vista nativa.
+  const subtitleStyle = useMemo(
+    () => ({
+      subtitlesFollowVideo: true,
+      paddingBottom: controlsVisible && !compact ? 56 : 12,
+    }),
+    [controlsVisible, compact],
+  );
 
   const containerStyle =
     (fullscreen || pipActive) && !compact
@@ -733,7 +745,9 @@ export default function VideoPlayer({
         onRestoreUserInterfaceForPictureInPictureStop={() =>
           videoRef.current?.restoreUserInterfaceForPictureInPictureStopCompleted(true)
         }
-        progressUpdateInterval={250}
+        // Cada aviso de progreso re-renderiza el overlay entero. Con los controles
+        // ocultos lo único que se mueve es la barra fina, así que basta 1 por segundo.
+        progressUpdateInterval={controlsVisible || scrubbing ? 250 : 1000}
         onLoad={onLoad}
         onProgress={onProgress}
         onBuffer={onBuffer}
@@ -1062,17 +1076,27 @@ export default function VideoPlayer({
                 <View
                   style={[
                     styles.previewFrame,
-                    {height: Math.round(previewTile.height * previewScale)},
+                    {height: Math.round(previewNaturalHeight * previewScale)},
                   ]}>
-                  <Image
-                    source={previewTile.image}
-                    style={{
-                      width: previewTile.sheetWidth * previewScale,
-                      height: previewTile.sheetHeight * previewScale,
-                      marginLeft: -previewTile.x * previewScale,
-                      marginTop: -previewTile.y * previewScale,
-                    }}
-                  />
+                  <View
+                    style={[
+                      styles.previewCrop,
+                      {
+                        width: previewNaturalWidth,
+                        height: previewNaturalHeight,
+                        transform: [{scale: previewScale}],
+                      },
+                    ]}>
+                    <Image
+                      source={previewTile.image}
+                      style={{
+                        width: previewTile.sheetWidth / density,
+                        height: previewTile.sheetHeight / density,
+                        marginLeft: -previewTile.x / density,
+                        marginTop: -previewTile.y / density,
+                      }}
+                    />
+                  </View>
                 </View>
                 <Text style={styles.previewTime}>{formatTime(scrubTime)}</Text>
               </View>
@@ -1498,6 +1522,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     overflow: 'hidden',
   },
+  previewCrop: {transformOrigin: 'top left', overflow: 'hidden'},
   previewTime: {
     color: '#fff',
     fontSize: 12,
