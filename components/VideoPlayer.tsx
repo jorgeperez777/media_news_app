@@ -658,8 +658,11 @@ export default function VideoPlayer({
       : mode === 'on'
       ? 'Siempre activado'
       : 'Desactivado';
+  // iOS puede anunciar pistas con título vacío (AVPlayer expone la opción legible
+  // aunque el stream no traiga subtítulos), así que no vale `??`: hay que caer al
+  // idioma o al número también con cadena vacía.
   const trackLabel = (track: TextTrack) =>
-    track.title ?? track.language ?? `Pista ${track.index + 1}`;
+    track.title || track.language || `Pista ${track.index + 1}`;
   const subtitleLabel = () => {
     if (subtitle === 'off') {
       return 'Desactivados';

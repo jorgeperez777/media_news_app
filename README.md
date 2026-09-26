@@ -256,6 +256,10 @@ alterna entre apagado y la última pista elegida. En Android los subtítulos se 
 dentro del vídeo, así que `subtitleStyle` los sube mientras los controles tapan la
 parte de abajo; en iOS los coloca el sistema.
 
+En iOS, AVPlayer puede anunciar una pista legible sin título (pasa con el HLS de Mux,
+que no lleva subtítulos): por eso la etiqueta cae al idioma o a «Pista N» con `||` y no
+con `??`, que dejaba la fila en blanco.
+
 La fuente «Apple BipBop» de `sources.ts` trae ocho pistas (inglés, francés, español y
 japonés, cada una normal y forzada) para probarlo. También se pueden pasar pistas
 externas (.vtt, y .srt/.ttml solo en Android) en `source.textTracks`, pero en iOS eso
