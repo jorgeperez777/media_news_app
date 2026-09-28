@@ -47,15 +47,16 @@ yarn ios              # simulador iOS
 
 ```
 App.tsx ─ PlayerProvider (player/PlayerContext.tsx)
-          ├─ LiveScreen / ListScreen / DetailScreen / PlaceholderScreen  ← según la pestaña
+          ├─ LiveScreen / ListScreen / SeriesScreen / DetailScreen / …  ← según la pestaña
           ├─ TabBar (components/TabBar.tsx)          ← TV en vivo · Vídeos · Buscar · Perfil
           └─ PlayerHost (components/PlayerHost.tsx)  ← el <VideoPlayer>, siempre montado
 ```
 
 El catálogo (`sources.ts`) marca cada entrada con `kind`: los `live` salen en **TV en
-vivo** y los `vod` en **Vídeos**. `LIVE_CHANNELS` y `VOD_ITEMS` son las dos vistas del
-mismo array, cada una con el índice global que usa el reproductor, así que ⏮/⏭ se mueven
-dentro de la sección del elemento actual (un canal no salta a un vídeo a la carta).
+vivo**, los `vod` en **Vídeos** y los `episode` en la ficha de su serie. `LIVE_CHANNELS`,
+`VOD_ITEMS` y `SERIES` son vistas del mismo array, cada una con el índice global que usa
+el reproductor, así que ⏮/⏭ se mueven dentro de la sección del elemento actual (un canal
+no salta a un vídeo a la carta, y un episodio solo encadena con los de su serie).
 
 El miniplayer estilo YouTube exige que **la instancia de `<Video>` no se desmonte** al
 cambiar de pantalla: en React Native no se puede reparentar una vista nativa, así que si
@@ -180,6 +181,8 @@ geometría de Material Symbols: un viewBox 24×24 común, color y tamaño por pr
 | ⚙ (arriba derecha) | Menú: **Audio** (pistas del stream), **Calidad** (Auto + alturas disponibles, p. ej. 1080p/720p/480p, vía `onVideoTracks` + `selectedVideoTrack`; en iOS 15+ es un tope de resolución), **Ahorro de datos**, **Subtítulos** y **Velocidad** 0.5x – 2x |
 | CC (arriba derecha) | Enciende/apaga los subtítulos; solo aparece si el vídeo trae pistas. Azul = activos |
 | ⛶ (abajo derecha) | Pantalla completa: rota a horizontal, botón atrás sale |
+| 🔒 (abajo derecha, solo inmersivo) | Bloquea la pantalla: se van controles y gestos hasta desbloquear (ver [Series: modo inmersivo](#series-modo-inmersivo-como-netflix)) |
+| ☰ (abajo derecha, con `episodes`) | Hoja de episodios: cambia de episodio sin salir del reproductor |
 | Spinner | Mientras hace buffering |
 | ▭ (arriba derecha, junto a ⚙) | Picture in Picture manual; también entra solo al salir de la app (`enterPictureInPictureOnLeave`). Solo aparece donde el dispositivo lo soporta |
 | Botón de cast / AirPlay (arriba derecha) | Envía el vídeo a un Chromecast o a AirPlay (ver [Chromecast y AirPlay](#chromecast-y-airplay)) |
@@ -213,7 +216,12 @@ props, `features` y `accent`.
 | `settingsButton` | El botón ⚙ y su menú entero |
 | `pipButton` | El botón ▭ (que además necesita que el dispositivo soporte PiP) |
 | `routeButtons` | Los botones de Chromecast y AirPlay |
-| `fullscreenButton` | El botón ⤢ |
+| `fullscreenButton` | El botón ⤢ (por defecto solo en `presentation="inline"`) |
+| `lockButton` | El candado 🔒 (por defecto solo en `presentation="immersive"`) |
+| `skipIntro` | El botón «Saltar intro» de los tramos saltables |
+| `nextUpCard` | La tarjeta de «a continuación» del final |
+| `verticalGestures` | Deslizar arriba/abajo para volumen y brillo |
+| `pinchToFill` | El pellizco para ajustar/rellenar |
 
 Quitar un control quita el control, no la función: sin `skipButtons` el doble tap
 sigue saltando ±10 s, y sin `subtitlesButton` las pistas siguen en ⚙. Para
@@ -224,6 +232,43 @@ mismo**: la parte reproducida de la barra y su tirador, la barra fina, el botón
 encendido, la opción marcada en ⚙ y el badge EN VIVO cuando vas en directo. Antes
 la barra era roja y lo activo azul; ahora salen del mismo sitio, así que para
 dejarlo todo azul basta `accent="#3ea6ff"`.
+
+### Series: modo inmersivo (como Netflix)
+
+La pestaña **Vídeos** lleva una serie de ejemplo (*Open Movies*, 3 episodios). Un
+episodio **no** se empotra en una ficha como los vídeos sueltos: se abre ya en
+horizontal y a pantalla completa, y atrás cierra y devuelve a la ficha de la serie.
+
+```tsx
+player.open(episode.index, {presentation: 'immersive'});
+```
+
+```tsx
+<VideoPlayer
+  presentation="immersive"   // nace a pantalla completa; atrás llama a onClose
+  onClose={player.close}
+  episodes={episodes}        // saca el botón ☰ y la hoja de episodios
+  currentEpisodeId={index}
+  onSelectEpisode={id => player.goTo(Number(id))}
+  nextUp={{title: next.title, label: 'Siguiente episodio'}}
+/>
+```
+
+| | `inline` (YouTube) | `immersive` (Netflix) |
+|---|---|---|
+| Al abrir | Empotrado en su hueco, en vertical | Ya en horizontal y a pantalla completa |
+| Atrás | Sale de pantalla completa | Cierra el reproductor (`onClose`) |
+| Botones propios | ⤢ y ⌄ (miniplayer) | ← cerrar, 🔒 candado y ☰ episodios |
+
+El candado deja la pantalla sorda (ni controles ni gestos) y un toque saca la pastilla
+de «Desbloquear»; con el candado puesto, atrás solo desbloquea. Quien envuelve al
+reproductor tiene que dibujarlo a pantalla completa desde el primer fotograma
+(`PlayerHost` usa `absoluteFill` en cuanto la presentación es inmersiva), y al
+desmontarse el reproductor vuelve a bloquear el vertical.
+
+También se puede mandar la pantalla completa desde fuera con la prop `fullscreen`
+(controlada, como `paused`): si se pasa, el reproductor solo la pide por
+`onFullscreenChange`.
 
 ### Acelerar manteniendo pulsado (x2)
 

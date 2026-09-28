@@ -13,6 +13,7 @@ const es = {
   'menu.subtitles': 'Subtítulos',
   'menu.audio': 'Audio',
   'menu.speed': 'Velocidad de reproducción',
+  'menu.episodes': 'Episodios',
   'menu.saverHint':
     'Limita el bitrate cuando no estás en Wi-Fi. La calidad sigue ajustándose sola por debajo de ese tope.',
 
@@ -62,6 +63,8 @@ const es = {
   'next.inSeconds': 'Empieza en {seconds} s',
   'next.playNow': 'Reproducir ya',
   'next.cancel': 'Cancelar',
+  'next.nextEpisode': 'Siguiente episodio',
+  'lock.unlock': 'Desbloquear',
 
   // Gestos
   'gesture.volume': 'Volumen',
@@ -94,6 +97,11 @@ const es = {
   'a11y.surface': 'Vídeo. Toca para mostrar los controles',
   'a11y.retry': 'Reintentar la reproducción',
   'a11y.back10': 'Retrocede 10 segundos',
+  'a11y.lock': 'Bloquear la pantalla',
+  'a11y.unlock': 'Desbloquear la pantalla',
+  'a11y.locked': 'Pantalla bloqueada. Toca para desbloquear',
+  'a11y.episodes': 'Episodios',
+  'a11y.closePlayer': 'Cerrar el reproductor',
 
   // Pantallas
   'tab.live': 'TV en vivo',
@@ -114,6 +122,16 @@ const es = {
   'screen.error': 'Error: {message}',
   'screen.continueWatching': 'Seguir viendo · {position}',
   'screen.liveInMini': 'El canal está en el miniplayer',
+  'screen.seriesTitle': 'Series',
+  'screen.seriesIntro':
+    'Una serie abre sus episodios como Netflix: directo a horizontal y a pantalla completa. Atrás cierra el episodio y te devuelve aquí.',
+  'screen.seriesEpisodes': '{count} episodios',
+  'screen.seriesBadge': 'T{season}:E{number}',
+  'screen.seriesHint':
+    'Dentro del episodio: ☰ cambia de episodio sin salir, 🔒 bloquea la pantalla, «Saltar intro» aparece en la intro y al final sale el siguiente episodio.',
+  'screen.play': 'Reproducir',
+  'screen.resume': 'Seguir viendo',
+  'screen.episodeOf': '{position} de {total}',
   'screen.searchTitle': 'Buscar',
   'screen.searchBody':
     'Pestaña de ejemplo. Sirve para comprobar que el miniplayer sigue reproduciendo al cambiar de pestaña.',
@@ -141,6 +159,7 @@ const en: Record<keyof typeof es, string> = {
   'menu.subtitles': 'Subtitles',
   'menu.audio': 'Audio',
   'menu.speed': 'Playback speed',
+  'menu.episodes': 'Episodes',
   'menu.saverHint':
     'Caps the bitrate when you are off Wi-Fi. Quality still adapts on its own below that cap.',
 
@@ -186,6 +205,8 @@ const en: Record<keyof typeof es, string> = {
   'next.inSeconds': 'Starts in {seconds} s',
   'next.playNow': 'Play now',
   'next.cancel': 'Cancel',
+  'next.nextEpisode': 'Next episode',
+  'lock.unlock': 'Unlock',
 
   'gesture.volume': 'Volume',
   'gesture.brightness': 'Brightness',
@@ -216,6 +237,11 @@ const en: Record<keyof typeof es, string> = {
   'a11y.surface': 'Video. Tap to show the controls',
   'a11y.retry': 'Retry playback',
   'a11y.back10': 'Goes back 10 seconds',
+  'a11y.lock': 'Lock the screen',
+  'a11y.unlock': 'Unlock the screen',
+  'a11y.locked': 'Screen locked. Tap to unlock',
+  'a11y.episodes': 'Episodes',
+  'a11y.closePlayer': 'Close the player',
 
   'tab.live': 'Live TV',
   'tab.videos': 'Videos',
@@ -235,6 +261,16 @@ const en: Record<keyof typeof es, string> = {
   'screen.error': 'Error: {message}',
   'screen.continueWatching': 'Continue watching · {position}',
   'screen.liveInMini': 'The channel is in the mini player',
+  'screen.seriesTitle': 'Series',
+  'screen.seriesIntro':
+    'A series opens its episodes the way Netflix does: straight to landscape and full screen. Back closes the episode and brings you here.',
+  'screen.seriesEpisodes': '{count} episodes',
+  'screen.seriesBadge': 'S{season}:E{number}',
+  'screen.seriesHint':
+    'Inside an episode: ☰ switches episode without leaving, 🔒 locks the screen, “Skip intro” shows up during the intro and the next episode card appears at the end.',
+  'screen.play': 'Play',
+  'screen.resume': 'Resume',
+  'screen.episodeOf': '{position} of {total}',
   'screen.searchTitle': 'Search',
   'screen.searchBody':
     'Example tab. It is here to check that the mini player keeps playing when you switch tabs.',

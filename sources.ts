@@ -3,8 +3,11 @@ import type {Chapter} from './components/VideoPlayer';
 import type {StoryboardSource} from './components/useStoryboard';
 
 export type Source = {
-  /** 'live' sale en la pestaña TV en vivo; 'vod' en la lista de vídeos. */
-  kind: 'live' | 'vod';
+  /**
+   * 'live' sale en la pestaña TV en vivo, 'vod' en la lista de vídeos y
+   * 'episode' en la ficha de su serie (se abre a pantalla completa).
+   */
+  kind: 'live' | 'vod' | 'episode';
   label: string;
   title: string;
   description: string;
@@ -17,6 +20,17 @@ export type Source = {
   storyboard?: StoryboardSource;
   /** Tramos con nombre: muescas en la barra y «Saltar intro» en los saltables. */
   chapters?: Chapter[];
+  /** Serie a la que pertenece. Solo en los `episode`. */
+  series?: {id: string; title: string; description: string};
+  /** Temporada y número dentro de la serie. */
+  episode?: {season: number; number: number};
+};
+
+const OPEN_MOVIES = {
+  id: 'open-movies',
+  title: 'Open Movies',
+  description:
+    'Serie de ejemplo para el reproductor inmersivo: cada episodio se abre en horizontal a pantalla completa, con «Saltar intro», lista de episodios y tarjeta de siguiente episodio.',
 };
 
 const SOURCES: Source[] = [
@@ -130,6 +144,61 @@ const SOURCES: Source[] = [
       {title: 'La venganza', start: 420, end: 634},
     ],
   },
+  {
+    kind: 'episode',
+    label: 'T1:E1',
+    title: 'Angel One',
+    description:
+      'Episodio corto (1 min): sirve para ver la tarjeta de siguiente episodio sin esperar. Trae audio en 5 idiomas y subtítulos en 4.',
+    series: OPEN_MOVIES,
+    episode: {season: 1, number: 1},
+    source: {
+      uri: 'https://storage.googleapis.com/shaka-demo-assets/angel-one-hls/hls.m3u8',
+      metadata: {title: 'Angel One', subtitle: 'Open Movies · T1:E1', artist: 'VideoApp'},
+    },
+    chapters: [
+      {title: 'Intro', start: 0, end: 10, skippable: true},
+      {title: 'Episodio', start: 10, end: 60},
+    ],
+  },
+  {
+    kind: 'episode',
+    label: 'T1:E2',
+    title: 'Elephants Dream',
+    description: 'Episodio largo (11 min) en MP4 progresivo: reanudar donde lo dejaste y capítulos.',
+    series: OPEN_MOVIES,
+    episode: {season: 1, number: 2},
+    source: {
+      uri: 'https://archive.org/download/ElephantsDream/ed_hd.mp4',
+      metadata: {
+        title: 'Elephants Dream',
+        subtitle: 'Open Movies · T1:E2',
+        artist: 'VideoApp',
+      },
+    },
+    chapters: [
+      {title: 'Intro', start: 0, end: 25, skippable: true},
+      {title: 'La máquina', start: 25, end: 300},
+      {title: 'El abismo', start: 300, end: 654},
+    ],
+  },
+  {
+    kind: 'episode',
+    label: 'T1:E3',
+    title: 'Sintel',
+    description: 'Último episodio (15 min): al acabar no hay siguiente, así que la tarjeta no sale.',
+    series: OPEN_MOVIES,
+    episode: {season: 1, number: 3},
+    source: {
+      uri: 'https://archive.org/download/Sintel/sintel-2048-surround.mp4',
+      metadata: {title: 'Sintel', subtitle: 'Open Movies · T1:E3', artist: 'VideoApp'},
+    },
+    chapters: [
+      {title: 'Intro', start: 0, end: 20, skippable: true},
+      {title: 'La búsqueda', start: 20, end: 420},
+      {title: 'El reencuentro', start: 420, end: 888},
+    ],
+  },
 ];
 
 /** Entrada del catálogo junto con su índice global (el que usa el reproductor). */
@@ -144,6 +213,37 @@ const withIndex = (kind: Source['kind']): IndexedSource[] =>
 export const LIVE_CHANNELS = withIndex('live');
 /** Vídeos a la carta de la pestaña «Vídeos». */
 export const VOD_ITEMS = withIndex('vod');
+/** Episodios de todas las series. */
+export const EPISODE_ITEMS = withIndex('episode');
+
+export type Series = {
+  id: string;
+  title: string;
+  description: string;
+  episodes: IndexedSource[];
+};
+
+/** Series del catálogo, con sus episodios en orden. */
+export const SERIES: Series[] = EPISODE_ITEMS.reduce<Series[]>((list, item) => {
+  const meta = item.series;
+  if (!meta) {
+    return list;
+  }
+  const found = list.find(candidate => candidate.id === meta.id);
+  if (found) {
+    found.episodes.push(item);
+  } else {
+    list.push({...meta, episodes: [item]});
+  }
+  return list;
+}, []);
+
+export const seriesById = (id: string) =>
+  SERIES.find(candidate => candidate.id === id);
+
+/** Serie a la que pertenece un índice del catálogo, si es un episodio. */
+export const seriesOf = (index: number | null) =>
+  index === null ? undefined : seriesById(SOURCES[index].series?.id ?? '');
 
 /** Pestaña a la que pertenece un índice del catálogo. */
 export const isLive = (index: number | null) =>

@@ -56,6 +56,37 @@ export const loadPositions = () => readJson<Positions>(POSITIONS_KEY, {});
 export const loadPrefs = () => readJson<Prefs>(PREFS_KEY, {});
 export const savePrefs = (prefs: Prefs) => writeJson(PREFS_KEY, prefs);
 
+/**
+ * Aplica las reglas de «seguir viendo» a un mapa en memoria: guarda la posición,
+ * o la borra si ya no merece la pena recordarla (demasiado pronto, demasiado
+ * cerca del final, o sin duración conocida).
+ *
+ * Está separado de `savePosition` para que quien pinte la lista sin esperar al
+ * disco use exactamente el mismo criterio: si no, se quedan barras de «seguir
+ * viendo» en vídeos que ya se habían terminado.
+ */
+export function withPosition(
+  positions: Positions,
+  uri: string,
+  seconds: number,
+  duration: number,
+): Positions {
+  const next = {...positions};
+  if (
+    duration <= 0 ||
+    seconds < MIN_RESUME_S ||
+    seconds > duration - END_MARGIN_S
+  ) {
+    delete next[uri];
+  } else {
+    next[uri] = {seconds, duration, updatedAt: Date.now()};
+  }
+  const trimmed = Object.entries(next)
+    .sort((a, b) => b[1].updatedAt - a[1].updatedAt)
+    .slice(0, MAX_POSITIONS);
+  return Object.fromEntries(trimmed);
+}
+
 /** Guarda (o borra, si ya no merece la pena) la posición de un vídeo. */
 export async function savePosition(
   uri: string,
@@ -63,18 +94,7 @@ export async function savePosition(
   duration: number,
 ) {
   const positions = await loadPositions();
-  if (
-    duration > 0 &&
-    (seconds < MIN_RESUME_S || seconds > duration - END_MARGIN_S)
-  ) {
-    delete positions[uri];
-  } else {
-    positions[uri] = {seconds, duration, updatedAt: Date.now()};
-  }
-  const trimmed = Object.entries(positions)
-    .sort((a, b) => b[1].updatedAt - a[1].updatedAt)
-    .slice(0, MAX_POSITIONS);
-  await writeJson(POSITIONS_KEY, Object.fromEntries(trimmed));
+  await writeJson(POSITIONS_KEY, withPosition(positions, uri, seconds, duration));
 }
 
 /** Posición desde la que arrancar, o 0 si toca empezar de cero. */

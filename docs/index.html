@@ -112,6 +112,7 @@
     <a href="#props">Props</a>
     <a href="#features">features</a>
     <a href="#accent">accent</a>
+    <a href="#inmersivo">Modo inmersivo</a>
   </div>
   <p>Comportamiento</p>
   <div class="navlinks">
@@ -198,9 +199,15 @@
     <tr><td><code>style</code></td><td><code>StyleProp&lt;ViewStyle&gt;</code></td><td>—</td><td>Estilo del contenedor. El vídeo siempre ocupa la caja (<code>resizeMode="contain"</code>).</td></tr>
     <tr><td><code>accent</code></td><td><code>string</code></td><td><code>'#ff0000'</code></td><td>Color de la barra de progreso y de todo lo que indica «activo». Ver <a href="#accent">accent</a>.</td></tr>
     <tr><td><code>features</code></td><td><code>PlayerFeatures</code></td><td><code>{}</code> (todo activo)</td><td>Qué controles se ofrecen. Ver <a href="#features">features</a>.</td></tr>
+    <tr><td><code>presentation</code></td><td><code>'inline' | 'immersive'</code></td><td><code>'inline'</code></td><td>Cómo se presenta: empotrado (YouTube) o a pantalla completa en horizontal desde el primer fotograma (Netflix). Ver <a href="#inmersivo">modo inmersivo</a>.</td></tr>
+    <tr><td><code>fullscreen</code></td><td><code>boolean</code></td><td>—</td><td>Pantalla completa controlada desde fuera. Si se pasa, manda el padre y el reproductor solo la pide por <code>onFullscreenChange</code>; si no, la gestiona él.</td></tr>
+    <tr><td><code>onClose</code></td><td><code>() =&gt; void</code></td><td>—</td><td>Cerrar del todo. En <code>immersive</code> es lo que hacen el botón ← y el atrás de Android.</td></tr>
+    <tr><td><code>episodes</code></td><td><code>Episode[]</code></td><td>—</td><td>Lista de episodios: saca el botón ☰ y la hoja para cambiar de episodio sin salir del reproductor.</td></tr>
+    <tr><td><code>currentEpisodeId</code></td><td><code>string | number</code></td><td>—</td><td>El que se está viendo, para marcarlo en esa lista.</td></tr>
+    <tr><td><code>onSelectEpisode</code></td><td><code>(id) =&gt; void</code></td><td>—</td><td>Se eligió otro episodio en la hoja.</td></tr>
     <tr><td><code>storyboard</code></td><td><code>StoryboardSource</code></td><td>—</td><td>Miniaturas para la vista previa de la barra. Ver <a href="#preview">vista previa</a>.</td></tr>
     <tr><td><code>chapters</code></td><td><code>Chapter[]</code></td><td>—</td><td>Tramos con nombre: muescas en la barra, título junto al tiempo y «Saltar intro» en los marcados <code>skippable</code>.</td></tr>
-    <tr><td><code>nextUp</code></td><td><code>{title}</code></td><td>—</td><td>Qué viene después: saca la tarjeta de continuidad en los últimos 10 s.</td></tr>
+    <tr><td><code>nextUp</code></td><td><code>{title, label?}</code></td><td>—</td><td>Qué viene después: saca la tarjeta de continuidad en los últimos 10 s. <code>label</code> cambia el encabezado («Siguiente episodio» en una serie).</td></tr>
     <tr><td><code>startPosition</code></td><td><code>number</code></td><td><code>0</code></td><td>Segundo por el que arrancar («seguir viendo»). Se ignora en directo.</td></tr>
     <tr><td><code>onPositionChange</code></td><td><code>(seconds, duration) =&gt; void</code></td><td>—</td><td>Posición cada 5 s, para que quien lo use la guarde.</td></tr>
     <tr><td><code>prefs</code> / <code>onPrefsChange</code></td><td><code>Prefs</code></td><td>—</td><td>Idioma de subtítulos y de audio, calidad y velocidad recordados entre sesiones.</td></tr>
@@ -236,6 +243,7 @@
 <table>
   <thead><tr><th>Campo</th><th>Qué quita</th></tr></thead>
   <tbody>
+    <tr><td><code>lockButton</code></td><td>El candado 🔒 que bloquea la pantalla. Solo sale por defecto en <code>presentation="immersive"</code>; en <code>inline</code> hay que pedirlo (<code>features={{lockButton: true}}</code>).</td></tr>
     <tr><td><code>skipButtons</code></td><td>Los botones ⟲10 / ⟳10 de la fila central.</td></tr>
     <tr><td><code>doubleTapSkip</code></td><td>El doble tap en los lados para ±10 s. El tap sencillo pasa a actuar al instante, sin esperar al segundo.</td></tr>
     <tr><td><code>trackButtons</code></td><td>Los botones ⏮ / ⏭ (que además necesitan <code>onNext</code>/<code>onPrevious</code>).</td></tr>
@@ -279,6 +287,42 @@
 <p class="muted">
   Lo que <em>no</em> cambia: el buffer (gris), el fondo de los menús y los iconos en
   reposo (blancos). Son estados neutros, no acciones.
+</p>
+
+<h2 id="inmersivo">Modo inmersivo (series, como Netflix)</h2>
+<p>
+  Hay dos formas de presentar el reproductor, y cambian bastante más que el tamaño:
+</p>
+<table>
+  <thead><tr><th></th><th><code>inline</code> (YouTube)</th><th><code>immersive</code> (Netflix)</th></tr></thead>
+  <tbody>
+    <tr><td>Al abrir</td><td>Empotrado en su hueco, en vertical</td><td>Ya en horizontal y a pantalla completa</td></tr>
+    <tr><td>Rotación</td><td>Vertical; ⤢ pasa a horizontal</td><td>Horizontal mientras esté abierto (los dos sentidos)</td></tr>
+    <tr><td>Atrás</td><td>Sale de pantalla completa</td><td>Cierra el reproductor (<code>onClose</code>)</td></tr>
+    <tr><td>Botones propios</td><td>⤢ y ⌄ (miniplayer)</td><td>← cerrar, 🔒 candado y ☰ episodios</td></tr>
+  </tbody>
+</table>
+<pre><code>&lt;VideoPlayer
+  presentation="immersive"
+  source={episode.source}
+  title={episode.title}
+  onClose={player.close}
+  episodes={episodes}
+  currentEpisodeId={episode.id}
+  onSelectEpisode={id =&gt; player.goTo(Number(id))}
+  nextUp={{title: next.title, label: 'Siguiente episodio'}}
+  chapters={episode.chapters}
+/&gt;</code></pre>
+<ul>
+  <li><strong>El candado</strong> deja la pantalla sorda: se van los controles y los gestos, y un toque saca la pastilla de «Desbloquear» unos segundos. Con el candado puesto, el atrás de Android solo desbloquea (salir sin querer es justo lo que evita).</li>
+  <li><strong>La hoja de episodios</strong> marca el que suena y pinta lo ya visto de cada uno; elegir otro cambia la fuente sin recrear el reproductor nativo.</li>
+  <li>Quien lo envuelve tiene que dibujarlo a pantalla completa desde el principio (en la app de ejemplo, <code>PlayerHost</code> usa <code>absoluteFill</code> en cuanto la presentación es inmersiva), o se ve un fotograma con el vídeo aún en su caja.</li>
+  <li>Al desmontarse vuelve a bloquear el vertical: el resto de la app sigue siendo una app en portrait.</li>
+</ul>
+<p class="muted">
+  El <code>fullscreen</code> controlado sirve para lo mismo desde fuera (un botón propio,
+  un atajo de mando a distancia): si se pasa, el reproductor no cambia de estado él solo,
+  solo lo pide.
 </p>
 
 <h2 id="gestos">Gestos y controles</h2>
@@ -550,7 +594,25 @@ export type PlayerFeatures = {
   settingsButton?: boolean;
   pipButton?: boolean;
   routeButtons?: boolean;
-  fullscreenButton?: boolean;
+  fullscreenButton?: boolean;  // por defecto solo en 'inline'
+  lockButton?: boolean;        // por defecto solo en 'immersive'
+  skipIntro?: boolean;
+  nextUpCard?: boolean;
+  verticalGestures?: boolean;
+  pinchToFill?: boolean;
+};
+export type Chapter = {
+  title: string;
+  start: number;
+  end: number;
+  skippable?: boolean;
+};
+export type Episode = {
+  id: string | number;
+  title: string;
+  subtitle?: string;
+  /** Ya visto, de 0 a 1. */
+  progress?: number;
 };
 export function formatTime(seconds: number): string;
 

@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {VOD_ITEMS} from '../sources';
+import {SERIES, VOD_ITEMS} from '../sources';
 import {usePlayer} from '../player/PlayerContext';
 import {t} from '../i18n';
 import {MINI_HEIGHT} from '../components/PlayerHost';
@@ -9,8 +9,16 @@ import {PlayIcon} from '../components/icons';
 import {formatTime} from '../components/format';
 import {loadPositions, type Positions} from '../player/storage';
 
-/** Lista de vídeos. Tocar uno abre el detalle con el reproductor. */
-export default function ListScreen() {
+/**
+ * Lista de vídeos. Tocar uno abre el detalle con el reproductor empotrado; las
+ * series llevan a su ficha, desde donde los episodios se abren a pantalla
+ * completa (`onOpenSeries`).
+ */
+export default function ListScreen({
+  onOpenSeries,
+}: {
+  onOpenSeries: (id: string) => void;
+}) {
   const player = usePlayer();
   // «Seguir viendo»: se relee al volver de un vídeo (cambia player.index).
   const [positions, setPositions] = useState<Positions>({});
@@ -33,6 +41,27 @@ export default function ListScreen() {
       ]}>
       <Text style={styles.heading}>{t('screen.videosTitle')}</Text>
       <Text style={styles.hint}>{t('screen.videosIntro')}</Text>
+
+      {SERIES.map(series => (
+        <Pressable
+          key={series.id}
+          onPress={() => onOpenSeries(series.id)}
+          style={({pressed}) => [styles.row, pressed && styles.rowPressed]}>
+          <View style={styles.thumb}>
+            <Text style={styles.seriesBadge}>
+              {t('screen.seriesEpisodes', {count: series.episodes.length})}
+            </Text>
+          </View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle} numberOfLines={2}>
+              {series.title}
+            </Text>
+            <Text style={styles.rowSubtitle} numberOfLines={3}>
+              {series.description}
+            </Text>
+          </View>
+        </Pressable>
+      ))}
 
       {VOD_ITEMS.map(item => (
         <Pressable
@@ -94,6 +123,7 @@ const styles = StyleSheet.create({
   rowText: {flex: 1, gap: 4},
   rowTitle: {color: '#fff', fontSize: 15, fontWeight: '600'},
   rowSubtitle: {color: '#aaa', fontSize: 12, lineHeight: 16},
+  seriesBadge: {color: '#fff', fontSize: 12, fontWeight: '700'},
   resume: {gap: 4, marginTop: 2},
   resumeTrack: {
     height: 3,

@@ -1,13 +1,14 @@
-import React, {useState} from 'react';
+import React, {useCallback, useState} from 'react';
 import {StatusBar, StyleSheet, View} from 'react-native';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 import PlayerHost from './components/PlayerHost';
 import TabBar, {type TabKey} from './components/TabBar';
 import {PlayerProvider, usePlayer} from './player/PlayerContext';
-import {isLive} from './sources';
+import {isLive, seriesById} from './sources';
 import DetailScreen from './screens/DetailScreen';
 import DiagnosticsScreen from './screens/DiagnosticsScreen';
 import ListScreen from './screens/ListScreen';
+import SeriesScreen from './screens/SeriesScreen';
 import LiveScreen from './screens/LiveScreen';
 import PlaceholderScreen from './screens/PlaceholderScreen';
 
@@ -30,13 +31,23 @@ export default function App() {
 function Main() {
   const player = usePlayer();
   const [tab, setTab] = useState<TabKey>('videos');
+  // Ficha de serie abierta dentro de la pestaña Vídeos (una pila de dos niveles).
+  const [seriesId, setSeriesId] = useState<string | null>(null);
+  const series = seriesId ? seriesById(seriesId) : undefined;
+  // Estable: si cambiara en cada render, el BackHandler de la ficha se volvería a
+  // registrar sin parar.
+  const closeSeries = useCallback(() => setSeriesId(null), []);
 
   const showDetail =
     tab === 'videos' &&
     player.index !== null &&
     !isLive(player.index) &&
-    player.mode === 'full';
-  const immersive = player.fullscreen || player.pip;
+    player.mode === 'full' &&
+    // Los episodios no se empotran: se abren a pantalla completa sobre la ficha.
+    player.presentation === 'inline';
+  // El reproductor tapa la app entera: fuera barra de pestañas e insets.
+  const covering =
+    player.fullscreen || player.pip || player.presentation === 'immersive';
 
   /** Pestaña a la que pertenece lo que está abierto en el reproductor. */
   const homeTab: TabKey = isLive(player.index) ? 'envivo' : 'videos';
@@ -47,15 +58,17 @@ function Main() {
         style={styles.screens}
         // En pantalla completa / PiP manda el reproductor con sus propios insets;
         // abajo manda la barra de pestañas, que ya aplica el inset inferior.
-        edges={immersive ? [] : ['top', 'left', 'right']}>
+        edges={covering ? [] : ['top', 'left', 'right']}>
         <StatusBar barStyle="light-content" />
         {tab === 'envivo' ? (
           <LiveScreen />
         ) : tab === 'videos' ? (
           showDetail ? (
             <DetailScreen />
+          ) : series ? (
+            <SeriesScreen series={series} onBack={closeSeries} />
           ) : (
-            <ListScreen />
+            <ListScreen onOpenSeries={setSeriesId} />
           )
         ) : tab === 'perfil' ? (
           <DiagnosticsScreen />
@@ -64,7 +77,7 @@ function Main() {
         )}
       </SafeAreaView>
 
-      {!immersive && (
+      {!covering && (
         <TabBar
           active={tab}
           onChange={next => {

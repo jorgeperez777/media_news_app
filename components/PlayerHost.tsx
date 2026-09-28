@@ -7,7 +7,8 @@ import {
   View,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import SOURCES from '../sources';
+import SOURCES, {seriesOf} from '../sources';
+import {t} from '../i18n';
 import {usePlayer} from '../player/PlayerContext';
 import {TAB_BAR_HEIGHT} from './TabBar';
 import VideoPlayer from './VideoPlayer';
@@ -18,10 +19,12 @@ import {
   resumeFrom,
   savePosition,
   savePrefs,
+  withPosition,
   type Positions,
   type Prefs,
 } from '../player/storage';
 import {CloseIcon, PauseIcon, PlayIcon} from './icons';
+import {formatTime} from './format';
 
 /** Alto de la barra del miniplayer y ancho del vídeo dentro de ella (16:9). */
 export const MINI_HEIGHT = 72;
@@ -84,7 +87,10 @@ export default function PlayerHost() {
   const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  const {index, mode, fullscreen, pip} = player;
+  const {index, mode, presentation, fullscreen, pip} = player;
+  // Inmersivo (una serie, como Netflix): el reproductor nace a pantalla completa,
+  // así que la caja no lo acota desde el primer fotograma.
+  const immersive = presentation === 'immersive';
 
   // Caja expandida: el hueco que publica la pantalla de detalle.
   const full = useMemo(
@@ -119,20 +125,44 @@ export default function PlayerHost() {
   const isMini = mode === 'mini';
   const box = isMini ? mini : full;
 
-  // En pantalla completa (o PiP) el reproductor se dibuja él mismo a pantalla
-  // completa: la caja tiene que dejar de acotarlo.
-  const containerStyle =
-    fullscreen || pip
-      ? StyleSheet.absoluteFill
-      : {left: box.x, top: box.y, width: box.width, height: box.height};
+  // En pantalla completa (o PiP, o inmersivo) el reproductor se dibuja él mismo a
+  // pantalla completa: la caja tiene que dejar de acotarlo.
+  const covering = fullscreen || pip || immersive;
+  const containerStyle = covering
+    ? StyleSheet.absoluteFill
+    : {left: box.x, top: box.y, width: box.width, height: box.height};
 
-  const videoStyle =
-    fullscreen || pip
-      ? {width: '100%' as const, height: '100%' as const}
-      : {
-          width: isMini ? MINI_VIDEO_WIDTH : box.width,
-          height: isMini ? MINI_HEIGHT : box.height,
-        };
+  const videoStyle = covering
+    ? {width: '100%' as const, height: '100%' as const}
+    : {
+        width: isMini ? MINI_VIDEO_WIDTH : box.width,
+        height: isMini ? MINI_HEIGHT : box.height,
+      };
+
+  // Lista de episodios de la serie abierta (si lo que suena es un episodio), con
+  // lo ya visto de cada uno para pintar su barrita.
+  const series = seriesOf(index);
+  const episodes = series?.episodes.map(item => {
+    const uri = item.source.uri;
+    const saved = positions[uri];
+    const badge = item.episode
+      ? t('screen.seriesBadge', {
+          season: item.episode.season,
+          number: item.episode.number,
+        })
+      : item.label;
+    return {
+      id: item.index,
+      title: item.title,
+      subtitle: saved
+        ? `${badge} · ${t('screen.continueWatching', {
+            position: formatTime(saved.seconds),
+          })}`
+        : badge,
+      progress:
+        saved && saved.duration > 0 ? saved.seconds / saved.duration : 0,
+    };
+  });
 
   return (
     <View style={[styles.host, containerStyle, isMini && styles.hostMini]}>
@@ -147,10 +177,11 @@ export default function PlayerHost() {
               return;
             }
             savePosition(sourceUri, seconds, duration);
-            setPositions(saved => ({
-              ...saved,
-              [sourceUri]: {seconds, duration, updatedAt: Date.now()},
-            }));
+            // Mismo criterio que en disco: lo que ya no se recuerda desaparece
+            // también de la lista de episodios.
+            setPositions(saved =>
+              withPosition(saved, sourceUri, seconds, duration),
+            );
           }}
           prefs={prefs}
           onPrefsChange={persistPrefs}
@@ -162,9 +193,17 @@ export default function PlayerHost() {
           onPausedChange={player.setPaused}
           storyboard={current.storyboard}
           chapters={current.chapters}
+          presentation={presentation}
+          onClose={player.close}
+          episodes={episodes}
+          currentEpisodeId={index}
+          onSelectEpisode={id => player.goTo(Number(id))}
           nextUp={
             player.nextIndex !== null
-              ? {title: SOURCES[player.nextIndex].title}
+              ? {
+                  title: SOURCES[player.nextIndex].title,
+                  label: series ? t('next.nextEpisode') : undefined,
+                }
               : undefined
           }
           dataSaver={player.dataSaver}
@@ -172,7 +211,7 @@ export default function PlayerHost() {
           onError={player.setError}
           onFullscreenChange={player.setFullscreen}
           onPipChange={player.setPip}
-          onMinimize={player.minimize}
+          onMinimize={immersive ? undefined : player.minimize}
           hasPrevious={player.hasPrevious}
           hasNext={player.hasNext}
           onPrevious={() =>

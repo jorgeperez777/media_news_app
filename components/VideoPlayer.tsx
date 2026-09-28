@@ -7,6 +7,7 @@ import {
   PanResponder,
   PixelRatio,
   Pressable,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -48,10 +49,13 @@ import useNetworkCap, {mbps, type DataSaver} from './useNetworkCap';
 import useStoryboard, {type StoryboardSource} from './useStoryboard';
 import {
   AirPlayGlyph,
+  ArrowBackIcon,
   CastIcon,
   ChevronIcon,
+  EpisodesIcon,
   FastForwardIcon,
   FullscreenIcon,
+  LockIcon,
   StopIcon,
   PipIcon,
   PauseIcon,
@@ -68,6 +72,8 @@ const DOUBLE_TAP_MS = 300;
 // Tras un doble tap, taps sencillos dentro de esta ventana siguen saltando.
 const SKIP_CHAIN_MS = 800;
 const AUTO_HIDE_MS = 3000;
+// Cuánto se queda en pantalla la pastilla de «Desbloquear» al tocar con el candado puesto.
+const LOCK_HINT_MS = 3000;
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 // Mantener pulsado el vídeo acelera la reproducción hasta soltar (como TikTok).
 const BOOST_RATE = 2;
@@ -96,6 +102,20 @@ export type Chapter = {
 };
 
 /**
+ * Entrada de la lista de episodios que se abre desde el reproductor. `id` es lo
+ * que se devuelve en `onSelectEpisode`: quien nos use decide qué significa (el
+ * índice de su catálogo, un slug…).
+ */
+export type Episode = {
+  id: string | number;
+  title: string;
+  /** Segunda línea: temporada y número, duración, sinopsis corta… */
+  subtitle?: string;
+  /** Ya visto, de 0 a 1, para la barrita de la fila. */
+  progress?: number;
+};
+
+/**
  * Qué partes del overlay se ofrecen. Todas van activas por defecto: solo hace
  * falta pasar las que quieras quitar (`features={{skipButtons: false}}`).
  */
@@ -120,8 +140,16 @@ export type PlayerFeatures = {
   pipButton?: boolean;
   /** Botones de Chromecast y AirPlay. */
   routeButtons?: boolean;
-  /** Botón ⤢ de pantalla completa. */
+  /**
+   * Botón ⤢ de pantalla completa. Por defecto está en `inline` y no en
+   * `immersive`, donde el reproductor ya nace a pantalla completa.
+   */
   fullscreenButton?: boolean;
+  /**
+   * Candado para bloquear la pantalla y no darle sin querer mientras sujetas el
+   * móvil (como Netflix). Por defecto solo en `immersive`.
+   */
+  lockButton?: boolean;
   /** Botón «Saltar intro» en los capítulos marcados como saltables. */
   skipIntro?: boolean;
   /** Tarjeta de «a continuación» en los últimos segundos. */
@@ -137,8 +165,28 @@ type Props = {
   title?: string;
   style?: StyleProp<ViewStyle>;
   onError?: (message: string) => void;
+  /**
+   * Cómo se presenta el reproductor:
+   *
+   * - `inline` (por defecto): empotrado en su hueco, en vertical, con botón ⤢ y
+   *   miniplayer. Es el modelo de YouTube.
+   * - `immersive`: nace ya en horizontal a pantalla completa, sin ⤢ ni ⌄, y el
+   *   botón atrás (o la ← de la barra superior) cierra el reproductor llamando a
+   *   `onClose`. Es el modelo de Netflix con un episodio.
+   */
+  presentation?: 'inline' | 'immersive';
+  /**
+   * Pantalla completa controlada desde fuera. Si se pasa, manda el padre (el
+   * reproductor solo la pide por `onFullscreenChange`); si no, la gestiona él.
+   */
+  fullscreen?: boolean;
   /** Se llama al entrar/salir de pantalla completa (útil para ocultar el resto de la UI). */
   onFullscreenChange?: (fullscreen: boolean) => void;
+  /**
+   * Cerrar del todo. En `immersive` es lo que hace el botón atrás: no hay estado
+   * vertical al que volver.
+   */
+  onClose?: () => void;
   /** Se llama al entrar/salir de Picture in Picture. */
   onPipChange?: (active: boolean) => void;
   /**
@@ -175,8 +223,19 @@ type Props = {
   storyboard?: StoryboardSource;
   /** Capítulos del vídeo: marcas en la barra y botón de saltar intro. */
   chapters?: Chapter[];
-  /** Qué viene después, para la tarjeta de continuidad de los últimos segundos. */
-  nextUp?: {title: string};
+  /**
+   * Qué viene después, para la tarjeta de continuidad de los últimos segundos.
+   * `label` cambia el encabezado («Siguiente episodio» en una serie).
+   */
+  nextUp?: {title: string; label?: string};
+  /**
+   * Lista de episodios: saca el botón ☰ y la hoja para saltar a otro sin salir
+   * del reproductor. Sin `episodes` no hay botón.
+   */
+  episodes?: Episode[];
+  /** El que se está viendo, para marcarlo en la lista. */
+  currentEpisodeId?: string | number;
+  onSelectEpisode?: (id: string | number) => void;
   /**
    * Controles del sistema (notificación en Android, pantalla de bloqueo y centro de
    * control en iOS) con los metadatos de `source.metadata`. En iOS solo se ven en
@@ -230,7 +289,10 @@ export default function VideoPlayer({
   title,
   style,
   onError,
+  presentation = 'inline',
+  fullscreen: fullscreenProp,
   onFullscreenChange,
+  onClose,
   onPipChange,
   onMinimize,
   onNext,
@@ -246,6 +308,9 @@ export default function VideoPlayer({
   storyboard,
   chapters,
   nextUp,
+  episodes,
+  currentEpisodeId,
+  onSelectEpisode,
   notificationControls = true,
   playInBackground = false,
   startPosition = 0,
@@ -256,6 +321,8 @@ export default function VideoPlayer({
   accent = DEFAULT_ACCENT,
   onEvent,
 }: Props) {
+  // En inmersivo el reproductor ya ocupa la pantalla: no hay ⤢ ni ⌄, y sí candado.
+  const immersive = presentation === 'immersive';
   const {
     skipButtons = true,
     doubleTapSkip = true,
@@ -267,7 +334,8 @@ export default function VideoPlayer({
     settingsButton = true,
     pipButton = true,
     routeButtons = true,
-    fullscreenButton = true,
+    fullscreenButton = !immersive,
+    lockButton = immersive,
     skipIntro = true,
     nextUpCard = true,
     verticalGestures = true,
@@ -310,7 +378,29 @@ export default function VideoPlayer({
   const [isLive, setIsLive] = useState(false);
   const [liveOffset, setLiveOffset] = useState(-1);
   const [seekableDuration, setSeekableDuration] = useState(0);
-  const [fullscreen, setFullscreen] = useState(false);
+  // Pantalla completa: como `paused`, si llega por props manda el padre. En
+  // inmersivo nace activada.
+  const [ownFullscreen, setOwnFullscreen] = useState(immersive);
+  const fullscreen = fullscreenProp ?? ownFullscreen;
+  const fullscreenRef = useRef(fullscreen);
+  fullscreenRef.current = fullscreen;
+  const setFullscreen = useCallback(
+    (next: boolean | ((current: boolean) => boolean)) => {
+      const value = typeof next === 'function' ? next(fullscreenRef.current) : next;
+      fullscreenRef.current = value;
+      if (fullscreenProp === undefined) {
+        // Sin control externo, el aviso lo da el efecto al cambiar el estado.
+        setOwnFullscreen(value);
+      } else {
+        onFullscreenChange?.(value);
+      }
+    },
+    [fullscreenProp, onFullscreenChange],
+  );
+  // Candado: ignora los toques sobre el vídeo hasta desbloquear. `lockHint` es la
+  // pastilla de «Desbloquear» que aparece al tocar la pantalla bloqueada.
+  const [locked, setLocked] = useState(false);
+  const [lockHint, setLockHint] = useState(false);
   // Picture in Picture. En Android la ventana PiP muestra la Activity entera escalada,
   // así que mientras está activo ocultamos los controles y el vídeo ocupa todo.
   const [pipActive, setPipActive] = useState(false);
@@ -329,7 +419,14 @@ export default function VideoPlayer({
   const [controlsVisible, setControlsVisible] = useState(true);
   // Menú ⚙: principal → Calidad / Velocidad.
   const [menu, setMenu] = useState<
-    'main' | 'quality' | 'speed' | 'subtitles' | 'audio' | 'saver' | null
+    | 'main'
+    | 'quality'
+    | 'speed'
+    | 'subtitles'
+    | 'audio'
+    | 'saver'
+    | 'episodes'
+    | null
   >(null);
   // Calidad: 'auto' (ABR) o el alto en px de la variante elegida. Solo Android.
   const [videoTracks, setVideoTracks] = useState<VideoTrack[]>([]);
@@ -419,7 +516,52 @@ export default function VideoPlayer({
     interaction,
   ]);
 
-  // Fullscreen: rota a horizontal, avisa al padre y el botón atrás de Android sale.
+  // Candado: bloquear esconde los controles y deja la superficie sorda; un toque
+  // saca la pastilla de «Desbloquear» unos segundos y se vuelve a ir.
+  const lockHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashLockHint = useCallback(() => {
+    setLockHint(true);
+    if (lockHintTimer.current) {
+      clearTimeout(lockHintTimer.current);
+    }
+    lockHintTimer.current = setTimeout(() => setLockHint(false), LOCK_HINT_MS);
+  }, []);
+
+  const lock = useCallback(() => {
+    setLocked(true);
+    setMenu(null);
+    setControlsVisible(false);
+    flashLockHint();
+  }, [flashLockHint]);
+
+  const unlock = useCallback(() => {
+    setLocked(false);
+    setLockHint(false);
+    setControlsVisible(true);
+    touch();
+  }, [touch]);
+
+  // Pantalla completa: rota a horizontal (los dos sentidos, como Netflix: en
+  // Android `lockToLandscape` es SENSOR_LANDSCAPE), avisa al padre y se queda con
+  // el botón atrás de Android.
+  const backRef = useRef<() => void>(() => {});
+  backRef.current = () => {
+    if (locked) {
+      // Bloqueado, atrás solo suelta el candado: salir sin querer es justo lo que
+      // el candado evita.
+      unlock();
+      return;
+    }
+    if (immersive) {
+      // No hay estado vertical al que volver: atrás cierra.
+      if (onClose) {
+        onClose();
+      }
+      return;
+    }
+    setFullscreen(false);
+  };
+
   useEffect(() => {
     onFullscreenChange?.(fullscreen);
     if (!fullscreen) {
@@ -428,14 +570,15 @@ export default function VideoPlayer({
     }
     Orientation.lockToLandscape();
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      setFullscreen(false);
+      backRef.current();
       return true;
     });
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullscreen]);
 
-  useEffect(() => () => Orientation.unlockAllOrientations(), []);
+  // Al desmontar se vuelve a vertical: el resto de la app está en portrait.
+  useEffect(() => () => Orientation.lockToPortrait(), []);
 
   useEffect(() => {
     onPipChange?.(pipActive);
@@ -620,6 +763,9 @@ export default function VideoPlayer({
       if (skipHintTimer.current) {
         clearTimeout(skipHintTimer.current);
       }
+      if (lockHintTimer.current) {
+        clearTimeout(lockHintTimer.current);
+      }
     },
     [],
   );
@@ -796,8 +942,22 @@ export default function VideoPlayer({
     start: 0,
     distance: 0,
   }).current;
-  const gestureRef = useRef({verticalGestures, pinchToFill, volume, dim, compact});
-  gestureRef.current = {verticalGestures, pinchToFill, volume, dim, compact};
+  const gestureRef = useRef({
+    verticalGestures,
+    pinchToFill,
+    volume,
+    dim,
+    compact,
+    locked,
+  });
+  gestureRef.current = {
+    verticalGestures,
+    pinchToFill,
+    volume,
+    dim,
+    compact,
+    locked,
+  };
 
   const showHud = useCallback((label: string, value?: number) => {
     setHud({label, value});
@@ -819,9 +979,13 @@ export default function VideoPlayer({
       // El tap lo sigue atendiendo el Pressable de debajo.
       onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponderCapture: (e, g) => {
-        const {verticalGestures: vertical, pinchToFill: pinch, compact: mini} =
-          gestureRef.current;
-        if (mini) {
+        const {
+          verticalGestures: vertical,
+          pinchToFill: pinch,
+          compact: mini,
+          locked: blocked,
+        } = gestureRef.current;
+        if (mini || blocked) {
           return false;
         }
         if (pinch && e.nativeEvent.touches.length === 2) {
@@ -1121,6 +1285,7 @@ export default function VideoPlayer({
   const showSkipIntro =
     skipIntro &&
     !!currentChapter?.skippable &&
+    !locked &&
     !playerError &&
     !casting &&
     !pipActive &&
@@ -1132,6 +1297,7 @@ export default function VideoPlayer({
     !!nextUp &&
     !!onNext &&
     hasNext &&
+    !locked &&
     !isLive &&
     !casting &&
     !playerError &&
@@ -1296,7 +1462,7 @@ export default function VideoPlayer({
         />
       )}
 
-      {!compact && (
+      {!compact && !locked && (
         <View style={StyleSheet.absoluteFill} {...pan.panHandlers}>
           <Pressable
             accessibilityRole="button"
@@ -1309,6 +1475,32 @@ export default function VideoPlayer({
             onLongPress={startBoost}
             onPressOut={endBoost}
           />
+        </View>
+      )}
+
+      {/* Pantalla bloqueada: se come todos los toques y solo ofrece desbloquear */}
+      {locked && !compact && !pipActive && (
+        <View style={StyleSheet.absoluteFill}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.locked')}
+            style={StyleSheet.absoluteFill}
+            onPress={flashLockHint}
+          />
+          {lockHint && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.unlock')}
+              style={({pressed}) => [
+                styles.unlockPill,
+                {bottom: 24 + (fullscreen ? insets.bottom : 0)},
+                pressed && styles.dimmed,
+              ]}
+              onPress={unlock}>
+              <LockIcon open size={18} />
+              <Text style={styles.unlockText}>{t('lock.unlock')}</Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -1396,7 +1588,10 @@ export default function VideoPlayer({
           accessibilityLabel={t('chapter.skipIntro')}
           style={({pressed}) => [
             styles.skipIntro,
-            {bottom: 56 + (fullscreen ? insets.bottom : 0)},
+            {
+              bottom: 56 + (fullscreen ? insets.bottom : 0),
+              right: 16 + (fullscreen ? insets.right : 0),
+            },
             pressed && styles.dimmed,
           ]}
           onPress={() => {
@@ -1412,9 +1607,14 @@ export default function VideoPlayer({
         <View
           style={[
             styles.nextUp,
-            {bottom: 56 + (fullscreen ? insets.bottom : 0)},
+            {
+              bottom: 56 + (fullscreen ? insets.bottom : 0),
+              right: 12 + (fullscreen ? insets.right : 0),
+            },
           ]}>
-          <Text style={styles.nextUpLabel}>{t('next.upNext')}</Text>
+          <Text style={styles.nextUpLabel}>
+            {nextUp.label ?? t('next.upNext')}
+          </Text>
           <Text style={styles.nextUpTitle} numberOfLines={1}>
             {nextUp.title}
           </Text>
@@ -1508,7 +1708,7 @@ export default function VideoPlayer({
         </View>
       )}
 
-      {controlsVisible && !pipActive && (
+      {controlsVisible && !pipActive && !locked && (
         <View
           style={[StyleSheet.absoluteFill, fullscreen && controlsInsets]}
           pointerEvents="box-none">
@@ -1519,6 +1719,17 @@ export default function VideoPlayer({
           <View
             style={[styles.topBar, previewTile && styles.hidden]}
             pointerEvents={previewTile ? 'none' : 'box-none'}>
+            {/* ← cerrar: en inmersivo no hay vertical al que volver, se sale del todo. */}
+            {immersive && onClose && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.closePlayer')}
+                hitSlop={12}
+                style={styles.iconButton}
+                onPress={onClose}>
+                <ArrowBackIcon />
+              </Pressable>
+            )}
             {/* ⌄ minimizar: solo cuando hay miniplayer y no estamos en pantalla completa. */}
             {onMinimize && !fullscreen && (
               <Pressable
@@ -1734,6 +1945,32 @@ export default function VideoPlayer({
                   ) : null}
                 </Text>
               )}
+              <View style={styles.bottomRight} pointerEvents="box-none">
+              {/* ☰ Episodios: saltar a otro sin salir del reproductor */}
+              {!!episodes?.length && !playerError && (
+                <Pressable
+                  hitSlop={12}
+                  style={styles.iconButton}
+                  onPress={() => {
+                    setMenu('episodes');
+                    touch();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.episodes')}>
+                  <EpisodesIcon />
+                </Pressable>
+              )}
+              {/* 🔒 Bloquear la pantalla (los toques dejan de contar hasta soltarlo) */}
+              {lockButton && !playerError && !casting && (
+                <Pressable
+                  hitSlop={12}
+                  style={styles.iconButton}
+                  onPress={lock}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.lock')}>
+                  <LockIcon />
+                </Pressable>
+              )}
               {fullscreenButton && !casting && (
                 <Pressable
                   hitSlop={12}
@@ -1749,6 +1986,7 @@ export default function VideoPlayer({
                   <FullscreenIcon exit={fullscreen} />
                 </Pressable>
               )}
+              </View>
             </View>
             {previewTile && (
               <View
@@ -1852,7 +2090,15 @@ export default function VideoPlayer({
         onRequestClose={() => setMenu(null)}>
         <Pressable style={styles.menuBackdrop} onPress={() => setMenu(null)} />
         {/* statusBarTranslucent hace el Modal edge-to-edge: respetar la barra de navegación */}
-        <View style={[styles.menu, {paddingBottom: 16 + insets.bottom}]}>
+        <View
+          style={[
+            styles.menu,
+            {
+              paddingBottom: 16 + insets.bottom,
+              paddingLeft: insets.left,
+              paddingRight: insets.right,
+            },
+          ]}>
           {menu === 'main' && (
             <>
               <MenuRow
@@ -1917,6 +2163,32 @@ export default function VideoPlayer({
                 disabled={casting || isLive}
                 onPress={() => setMenu('speed')}
               />
+            </>
+          )}
+
+          {menu === 'episodes' && (
+            <>
+              <MenuHeader
+                title={t('menu.episodes')}
+                onBack={() => setMenu(null)}
+              />
+              <ScrollView style={styles.episodeList}>
+                {episodes?.map(episode => (
+                  <EpisodeRow
+                    key={episode.id}
+                    accent={accent}
+                    episode={episode}
+                    current={episode.id === currentEpisodeId}
+                    onPress={() => {
+                      setMenu(null);
+                      if (episode.id !== currentEpisodeId) {
+                        onSelectEpisode?.(episode.id);
+                      }
+                      touch();
+                    }}
+                  />
+                ))}
+              </ScrollView>
             </>
           )}
 
@@ -2078,6 +2350,56 @@ function MenuRow({
       <Text style={styles.menuItemValue} numberOfLines={1}>
         {value} ›
       </Text>
+    </Pressable>
+  );
+}
+
+/** Fila de la hoja de episodios: título, línea de detalle y lo ya visto. */
+function EpisodeRow({
+  episode,
+  current,
+  accent,
+  onPress,
+}: {
+  episode: Episode;
+  current: boolean;
+  accent: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{selected: current}}
+      style={({pressed}) => [styles.episodeRow, pressed && styles.dimmed]}
+      onPress={onPress}>
+      <View style={styles.episodeText}>
+        <Text
+          style={[styles.menuItemText, current && {color: accent}]}
+          numberOfLines={1}>
+          {episode.title}
+        </Text>
+        {episode.subtitle ? (
+          <Text style={styles.episodeSubtitle} numberOfLines={2}>
+            {episode.subtitle}
+          </Text>
+        ) : null}
+        {episode.progress !== undefined && episode.progress > 0 ? (
+          <View style={styles.episodeTrack}>
+            <View
+              style={[
+                styles.episodeFill,
+                {
+                  backgroundColor: accent,
+                  width: `${Math.min(100, episode.progress * 100)}%`,
+                },
+              ]}
+            />
+          </View>
+        ) : null}
+      </View>
+      {current ? (
+        <Text style={[styles.menuCheck, {color: accent}]}>▶</Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -2453,6 +2775,42 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   menuItemText: {color: '#fff', fontSize: 15},
+  // Con el candado o los episodios, la fila de abajo junta varios botones a la derecha.
+  bottomRight: {flexDirection: 'row', alignItems: 'center', gap: 6},
+  unlockPill: {
+    position: 'absolute',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+  },
+  unlockText: {color: '#fff', fontSize: 13, fontWeight: '700'},
+  // La lista de episodios puede ser larga: en horizontal la hoja no puede crecer más.
+  episodeList: {maxHeight: 260},
+  episodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  episodeText: {flex: 1, gap: 3},
+  episodeSubtitle: {color: '#aaa', fontSize: 12, lineHeight: 16},
+  episodeTrack: {
+    height: 3,
+    marginTop: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    overflow: 'hidden',
+  },
+  episodeFill: {height: '100%'},
   menuItemActive: {fontWeight: '700'},
   menuCheck: {color: '#fff', fontSize: 16},
 });

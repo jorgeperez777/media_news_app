@@ -18,6 +18,12 @@ type PlayerState = {
   index: number | null;
   /** 'full' = pantalla de detalle · 'mini' = barra flotante sobre la lista. */
   mode: 'full' | 'mini';
+  /**
+   * 'inline' = empotrado en su hueco, como YouTube (vertical, con ⤢ y miniplayer).
+   * 'immersive' = se abre ya en horizontal a pantalla completa y atrás cierra, como
+   * Netflix con un episodio.
+   */
+  presentation: 'inline' | 'immersive';
   paused: boolean;
   fullscreen: boolean;
   pip: boolean;
@@ -28,7 +34,7 @@ type PlayerState = {
 };
 
 type PlayerApi = PlayerState & {
-  open: (index: number) => void;
+  open: (index: number, options?: {presentation?: 'inline' | 'immersive'}) => void;
   close: () => void;
   minimize: () => void;
   expand: () => void;
@@ -66,6 +72,9 @@ const PlayerContext = createContext<PlayerApi | null>(null);
 export function PlayerProvider({children}: {children: React.ReactNode}) {
   const [index, setIndex] = useState<number | null>(null);
   const [mode, setMode] = useState<'full' | 'mini'>('full');
+  const [presentation, setPresentation] = useState<'inline' | 'immersive'>(
+    'inline',
+  );
   const [paused, setPaused] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [pip, setPip] = useState(false);
@@ -74,16 +83,22 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
   const [dataSaver, setDataSaver] = useState<DataSaver>('auto');
   const rootRef = useRef<React.ComponentRef<typeof View> | null>(null);
 
-  const open = useCallback((next: number) => {
-    setIndex(next);
-    setMode('full');
-    setPaused(false);
-    setError(null);
-  }, []);
+  const open = useCallback(
+    (next: number, options?: {presentation?: 'inline' | 'immersive'}) => {
+      setIndex(next);
+      setMode('full');
+      setPresentation(options?.presentation ?? 'inline');
+      setPaused(false);
+      setError(null);
+    },
+    [],
+  );
 
   const close = useCallback(() => {
     setIndex(null);
     setMode('full');
+    setPresentation('inline');
+    setFullscreen(false);
     setAnchor(null);
     setError(null);
   }, []);
@@ -95,11 +110,15 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
   }, []);
 
   // ⏮/⏭ se mueven dentro de la sección del elemento actual: un canal en vivo no
-  // salta a un vídeo a la carta ni al contrario.
+  // salta a un vídeo a la carta ni al contrario, y un episodio solo encadena con
+  // los de su propia serie.
   const neighbour = useCallback((from: number, step: number) => {
-    const kind = SOURCES[from].kind;
+    const current = SOURCES[from];
     for (let i = from + step; i >= 0 && i < SOURCES.length; i += step) {
-      if (SOURCES[i].kind === kind) {
+      if (
+        SOURCES[i].kind === current.kind &&
+        SOURCES[i].series?.id === current.series?.id
+      ) {
         return i;
       }
     }
@@ -113,6 +132,7 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
     () => ({
       index,
       mode,
+      presentation,
       paused,
       fullscreen,
       pip,
@@ -139,6 +159,7 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
     [
       index,
       mode,
+      presentation,
       paused,
       fullscreen,
       pip,
