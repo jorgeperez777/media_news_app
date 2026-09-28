@@ -32,7 +32,7 @@ target 'VideoApp' do
       # :ccache_enabled => true
     )
 
-    # Xcode 26+: the `fmt` pod bundled with RN 0.78 fails to compile as C++20
+    # Xcode 26+: the `fmt` pod fails to compile as C++20
     # ("call to consteval function ... is not a constant expression").
     # Build it as C++17, as upstream react-native-video does in its example app.
     installer.pods_project.targets.each do |target|

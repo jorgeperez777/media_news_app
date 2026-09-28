@@ -44,7 +44,7 @@ type PlayerApi = PlayerState & {
    * measureInWindow: en Android sus coordenadas no incluyen la barra de estado y
    * el reproductor acababa desplazado hacia arriba).
    */
-  rootRef: React.RefObject<View | null>;
+  rootRef: React.RefObject<React.ComponentRef<typeof View> | null>;
   /** Vecinos dentro de la misma sección (canales con canales, vídeos con vídeos). */
   previousIndex: number | null;
   nextIndex: number | null;
@@ -72,7 +72,7 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
   const [error, setError] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const [dataSaver, setDataSaver] = useState<DataSaver>('auto');
-  const rootRef = useRef<View | null>(null);
+  const rootRef = useRef<React.ComponentRef<typeof View> | null>(null);
 
   const open = useCallback((next: number) => {
     setIndex(next);

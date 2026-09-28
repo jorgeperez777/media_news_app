@@ -1,0 +1,15 @@
+diff --git a/iOS/RCTOrientation/Orientation.m b/iOS/RCTOrientation/Orientation.m
+index d93debf922f80a570c0bd06e26df571c5de36d96..840471d6d17eb74c8bc97f8dbbdaa2732da70966 100644
+--- a/iOS/RCTOrientation/Orientation.m
++++ b/iOS/RCTOrientation/Orientation.m
+@@ -53,7 +53,9 @@ static UIInterfaceOrientationMask _orientationMask = UIInterfaceOrientationMaskA
+ - (void)dealloc
+ {
+     [[NSNotificationCenter defaultCenter] removeObserver:self];
+-    [self removeListeners:1];
++    // RN 0.87 aborta ("Attempted to remove more listeners than added") si el módulo
++    // se libera sin que JS haya suscrito nada, que es lo que pasa en cada reload.
++    // El emisor se está destruyendo: no hay nada que dar de baja.
+ }
+ 
+ - (UIInterfaceOrientation)getInterfaceOrientation

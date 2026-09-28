@@ -1,3 +1,14 @@
 {
-  "extends": "@react-native/typescript-config/tsconfig.json"
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    // TypeScript 6 quitó el modo "react-native" de --jsx (el que trae la config base
+    // de RN 0.87). Aquí solo se comprueban tipos: el JSX lo transforma Babel.
+    "jsx": "react-jsx",
+    // Las librerías de terceros (svg, safe-area-context) todavía no están adaptadas a
+    // los tipos generados de RN 0.87: sus .d.ts no son cosa nuestra.
+    "skipLibCheck": true,
+    "types": ["jest"]
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["**/node_modules", "**/Pods"]
 }

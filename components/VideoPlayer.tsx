@@ -1569,16 +1569,16 @@ const styles = StyleSheet.create({
   },
   fullscreen: {
     // Ocupa el contenedor raíz (área útil, sin barra de navegación).
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 100,
     elevation: 100,
   },
   dim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   center: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1688,7 +1688,7 @@ const styles = StyleSheet.create({
   },
   boostText: {color: '#fff', fontSize: 13, fontWeight: '700'},
   errorOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.85)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1743,7 +1743,7 @@ const styles = StyleSheet.create({
   // Los botones de AirPlay y de cast son vistas nativas: necesitan tamaño explícito.
   routeButton: {width: 26, height: 26},
   castOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',

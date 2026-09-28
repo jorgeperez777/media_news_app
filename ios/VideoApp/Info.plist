@@ -44,6 +44,8 @@
 	<string>Se usa para encontrar dispositivos Chromecast en tu red.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
+	<key>RCTNewArchEnabled</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
