@@ -9,6 +9,8 @@ type Props = {
   onScrubStart: (time: number) => void;
   onScrub: (time: number) => void;
   onScrubEnd: (time: number) => void;
+  /** Color de la parte reproducida y del tirador. */
+  accent?: string;
 };
 
 const TRACK_HEIGHT = 3;
@@ -17,7 +19,7 @@ const THUMB = 12;
 const THUMB_ACTIVE = 18;
 
 export default function SeekBar(props: Props) {
-  const {currentTime, duration, buffered, scrubbing} = props;
+  const {currentTime, duration, buffered, scrubbing, accent = '#ff0000'} = props;
   const widthRef = useRef(1);
   const startXRef = useRef(0);
   // Los handlers se leen a través de un ref para que el PanResponder (creado
@@ -65,13 +67,16 @@ export default function SeekBar(props: Props) {
       {...pan.panHandlers}>
       <View style={[styles.track, {height: trackHeight}]}>
         <View style={[styles.buffered, {width: pct(buffered)}]} />
-        <View style={[styles.progress, {width: pct(currentTime)}]} />
+        <View
+          style={[styles.progress, {backgroundColor: accent, width: pct(currentTime)}]}
+        />
       </View>
       <View
         pointerEvents="none"
         style={[
           styles.thumb,
           {
+            backgroundColor: accent,
             width: thumb,
             height: thumb,
             borderRadius: thumb / 2,
@@ -107,10 +112,8 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: '#ff0000',
   },
   thumb: {
     position: 'absolute',
-    backgroundColor: '#ff0000',
   },
 });

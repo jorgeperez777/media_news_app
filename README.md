@@ -166,6 +166,47 @@ geometría de Material Symbols: un viewBox 24×24 común, color y tamaño por pr
 | ▭ (arriba derecha, junto a ⚙) | Picture in Picture manual; también entra solo al salir de la app (`enterPictureInPictureOnLeave`). Solo aparece donde el dispositivo lo soporta |
 | Botón de cast / AirPlay (arriba derecha) | Envía el vídeo a un Chromecast o a AirPlay (ver [Chromecast y AirPlay](#chromecast-y-airplay)) |
 
+Cualquiera de estos controles se puede quitar, y su color cambiarse, desde fuera: ver [Qué controles se ofrecen y de qué color](#qué-controles-se-ofrecen-y-de-qué-color-props).
+
+### Qué controles se ofrecen y de qué color (props)
+
+Todo el overlay se puede recortar desde fuera, sin tocar `VideoPlayer.tsx`: dos
+props, `features` y `accent`.
+
+```tsx
+<VideoPlayer
+  source={source}
+  // Todo lo que no se nombra sigue activo.
+  features={{skipButtons: false, trackButtons: false, holdToSpeed: false}}
+  // Barra de progreso y estados activos, del mismo color.
+  accent="#3ea6ff"
+/>
+```
+
+| `features` | Qué quita |
+|---|---|
+| `skipButtons` | Los botones ⟲10 / ⟳10 de la fila central |
+| `doubleTapSkip` | El doble tap en los lados; el tap pasa a actuar al instante |
+| `trackButtons` | Los botones ⏮ / ⏭ (que además necesitan `onNext`/`onPrevious`) |
+| `seekBar` | La barra arrastrable **y** la barra fina de cuando se ocultan los controles |
+| `seekPreview` | La miniatura al arrastrar (que además necesita `storyboard`) |
+| `holdToSpeed` | El x2 al mantener pulsado |
+| `subtitlesButton` | El botón CC; los subtítulos se siguen eligiendo en ⚙ |
+| `settingsButton` | El botón ⚙ y su menú entero |
+| `pipButton` | El botón ▭ (que además necesita que el dispositivo soporte PiP) |
+| `routeButtons` | Los botones de Chromecast y AirPlay |
+| `fullscreenButton` | El botón ⤢ |
+
+Quitar un control quita el control, no la función: sin `skipButtons` el doble tap
+sigue saltando ±10 s, y sin `subtitlesButton` las pistas siguen en ⚙. Para
+quitar la función hay que apagar las dos cosas.
+
+`accent` (por defecto `#ff0000`) es **un solo color para todo lo que significa lo
+mismo**: la parte reproducida de la barra y su tirador, la barra fina, el botón CC
+encendido, la opción marcada en ⚙ y el badge EN VIVO cuando vas en directo. Antes
+la barra era roja y lo activo azul; ahora salen del mismo sitio, así que para
+dejarlo todo azul basta `accent="#3ea6ff"`.
+
 ### Acelerar manteniendo pulsado (x2)
 
 Como en TikTok: mantén el dedo en cualquier lado del vídeo y va al doble de

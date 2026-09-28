@@ -77,6 +77,35 @@ const RETRY_DELAYS_MS = [2000, 4000, 8000, 16000, 30000];
 
 type Side = 'left' | 'right';
 
+/**
+ * Qué partes del overlay se ofrecen. Todas van activas por defecto: solo hace
+ * falta pasar las que quieras quitar (`features={{skipButtons: false}}`).
+ */
+export type PlayerFeatures = {
+  /** Botones ⟲10 / ⟳10 de la fila central. */
+  skipButtons?: boolean;
+  /** Doble tap en los lados para ±10 s. Sin él, el tap solo muestra/oculta. */
+  doubleTapSkip?: boolean;
+  /** Botones ⏮ / ⏭ (además hay que pasar `onNext`/`onPrevious`). */
+  trackButtons?: boolean;
+  /** Barra de progreso: la arrastrable y la fina de cuando se ocultan los controles. */
+  seekBar?: boolean;
+  /** Miniatura del instante al arrastrar (además hay que pasar `storyboard`). */
+  seekPreview?: boolean;
+  /** Mantener pulsado el vídeo para ir a x2. */
+  holdToSpeed?: boolean;
+  /** Botón CC. Los subtítulos se siguen pudiendo elegir en ⚙. */
+  subtitlesButton?: boolean;
+  /** Botón ⚙: calidad, ahorro de datos, subtítulos y velocidad. */
+  settingsButton?: boolean;
+  /** Botón ▭ de Picture in Picture (además el dispositivo tiene que soportarlo). */
+  pipButton?: boolean;
+  /** Botones de Chromecast y AirPlay. */
+  routeButtons?: boolean;
+  /** Botón ⤢ de pantalla completa. */
+  fullscreenButton?: boolean;
+};
+
 type Props = {
   source: ReactVideoSource;
   title?: string;
@@ -118,9 +147,19 @@ type Props = {
   onDataSaverChange?: (mode: DataSaver) => void;
   /** Miniaturas para la vista previa de la barra (ver `useStoryboard`). */
   storyboard?: StoryboardSource;
+  /** Controles que se ofrecen; por defecto, todos (ver `PlayerFeatures`). */
+  features?: PlayerFeatures;
+  /**
+   * Color de acento. Lo usan la barra de progreso y todo lo que dice "activo"
+   * (CC encendido, opción elegida en ⚙, badge EN VIVO cuando vas en directo),
+   * para que no haya dos colores distintos significando lo mismo.
+   */
+  accent?: string;
 };
 
 const BOTTOM_BAR_PADDING = 12;
+// Acento por defecto: el rojo de la barra de progreso.
+const DEFAULT_ACCENT = '#ff0000';
 // Ancho en pantalla de la miniatura de la vista previa; el alto lo pone el sprite.
 const PREVIEW_WIDTH = 160;
 
@@ -155,7 +194,22 @@ export default function VideoPlayer({
   dataSaver = 'auto',
   onDataSaverChange,
   storyboard,
+  features = {},
+  accent = DEFAULT_ACCENT,
 }: Props) {
+  const {
+    skipButtons = true,
+    doubleTapSkip = true,
+    trackButtons = true,
+    seekBar = true,
+    seekPreview = true,
+    holdToSpeed = true,
+    subtitlesButton = true,
+    settingsButton = true,
+    pipButton = true,
+    routeButtons = true,
+    fullscreenButton = true,
+  } = features;
   const videoRef = useRef<VideoRef>(null);
   const insets = useSafeAreaInsets();
 
@@ -221,7 +275,7 @@ export default function VideoPlayer({
   // de banda que publica ExoPlayer (`reportBandwidth`, solo Android).
   const networkCap = useNetworkCap(dataSaver);
   // Vista previa de la barra: recorte del storyboard para el instante arrastrado.
-  const tileAt = useStoryboard(storyboard);
+  const tileAt = useStoryboard(seekPreview ? storyboard : undefined);
   const [layoutWidth, setLayoutWidth] = useState(0);
   const [bandwidth, setBandwidth] = useState(0);
   // Subtítulos: pistas que anuncia el stream y la elegida ('off' = desactivados).
@@ -535,8 +589,8 @@ export default function VideoPlayer({
     if (pipActive) {
       return;
     }
-    if (!canSkip) {
-      // Directo: sin doble tap, el tap actúa al instante.
+    if (!canSkip || !doubleTapSkip) {
+      // Sin doble tap (directo, o desactivado por props) el tap actúa al instante.
       if (controlsVisible) {
         setControlsVisible(false);
       } else {
@@ -580,7 +634,8 @@ export default function VideoPlayer({
   // Mantener pulsado: x2 mientras el dedo siga abajo, como en TikTok. No en directo
   // (correríamos hasta el borde del directo y solo conseguiríamos un atasco) ni
   // transmitiendo (ahí la velocidad la manda el receptor).
-  const canBoost = !isLive && !casting && !playerError && !paused && !ended;
+  const canBoost =
+    holdToSpeed && !isLive && !casting && !playerError && !paused && !ended;
   // Si en ⚙ ya había puesto algo más rápido, su elección gana: acelerar nunca frena.
   const boostRate = Math.max(rate, BOOST_RATE);
 
@@ -747,7 +802,7 @@ export default function VideoPlayer({
   const canSkip = !isLive;
   // Botones de pista anterior/siguiente cuando hay lista (también en directo: una
   // lista puede tener varios canales en vivo).
-  const showTrackButtons = !!onNext || !!onPrevious;
+  const showTrackButtons = trackButtons && (!!onNext || !!onPrevious);
   const atLiveEdge = isLive && liveOffset >= 0 && liveOffset <= LIVE_EDGE_TOLERANCE_S;
   // Posición live del reproductor dentro de la ventana DVR.
   const livePosition = liveOffset >= 0 ? currentTime + liveOffset : seekableDuration;
@@ -982,12 +1037,15 @@ export default function VideoPlayer({
       )}
 
       {/* Barra fina de progreso cuando los controles están ocultos */}
-      {!controlsVisible && !pipActive && hasDvr && timelineDuration > 0 && (
+      {seekBar && !controlsVisible && !pipActive && hasDvr && timelineDuration > 0 && (
         <View pointerEvents="none" style={styles.miniTrack}>
           <View
             style={[
               styles.miniProgress,
-              {width: `${Math.min(100, (currentTime / timelineDuration) * 100)}%`},
+              {
+                backgroundColor: accent,
+                width: `${Math.min(100, (currentTime / timelineDuration) * 100)}%`,
+              },
             ]}
           />
         </View>
@@ -1020,24 +1078,28 @@ export default function VideoPlayer({
               {title ?? ''}
             </Text>
             <View style={styles.topRight} pointerEvents="box-none">
-              {/* AirPlay (iOS): abre el selector de rutas del sistema. */}
-              <AirPlayButton
-                style={styles.routeButton}
-                iconColor="#fff"
-                activeIconColor="#3ea6ff"
-              />
-              {/* Chromecast: el botón nativo se oculta solo si no hay dispositivos. */}
-              <CastButton style={styles.routeButton} tintColor="#fff" />
+              {routeButtons && (
+                <>
+                  {/* AirPlay (iOS): abre el selector de rutas del sistema. */}
+                  <AirPlayButton
+                    style={styles.routeButton}
+                    iconColor="#fff"
+                    activeIconColor={accent}
+                  />
+                  {/* Chromecast: el botón nativo se oculta solo si no hay dispositivos. */}
+                  <CastButton style={styles.routeButton} tintColor="#fff" />
+                </>
+              )}
               {/* CC: atajo para encender/apagar; la pista se elige en ⚙. */}
-              {!playerError && !casting && textTracks.length > 0 && (
+              {subtitlesButton && !playerError && !casting && textTracks.length > 0 && (
                 <Pressable
                   hitSlop={12}
                   style={styles.iconButton}
                   onPress={toggleSubtitles}>
-                  <SubtitlesIcon active={subtitle !== 'off'} />
+                  <SubtitlesIcon active={subtitle !== 'off'} activeColor={accent} />
                 </Pressable>
               )}
-              {pipSupported && !playerError && !casting && !airplay.active && (
+              {pipButton && pipSupported && !playerError && !casting && !airplay.active && (
                 <Pressable
                   hitSlop={12}
                   style={styles.iconButton}
@@ -1048,7 +1110,7 @@ export default function VideoPlayer({
                   <PipIcon />
                 </Pressable>
               )}
-              {!playerError && (
+              {settingsButton && !playerError && (
                 <Pressable
                   hitSlop={12}
                   style={styles.iconButton}
@@ -1084,13 +1146,15 @@ export default function VideoPlayer({
                   <TrackIcon direction="previous" />
                 </Pressable>
               )}
-              <Pressable
-                hitSlop={12}
-                style={[styles.iconButton, !canSkip && styles.hidden]}
-                disabled={!canSkip}
-                onPress={() => skip('left', false)}>
-                <SkipIcon direction="back" seconds={SKIP_SECONDS} />
-              </Pressable>
+              {skipButtons && (
+                <Pressable
+                  hitSlop={12}
+                  style={[styles.iconButton, !canSkip && styles.hidden]}
+                  disabled={!canSkip}
+                  onPress={() => skip('left', false)}>
+                  <SkipIcon direction="back" seconds={SKIP_SECONDS} />
+                </Pressable>
+              )}
               <Pressable
                 hitSlop={12}
                 style={[styles.playButton, uiBuffering && styles.hidden]}
@@ -1104,13 +1168,15 @@ export default function VideoPlayer({
                   <PauseIcon size={34} />
                 )}
               </Pressable>
-              <Pressable
-                hitSlop={12}
-                style={[styles.iconButton, !canSkip && styles.hidden]}
-                disabled={!canSkip}
-                onPress={() => skip('right', false)}>
-                <SkipIcon direction="forward" seconds={SKIP_SECONDS} />
-              </Pressable>
+              {skipButtons && (
+                <Pressable
+                  hitSlop={12}
+                  style={[styles.iconButton, !canSkip && styles.hidden]}
+                  disabled={!canSkip}
+                  onPress={() => skip('right', false)}>
+                  <SkipIcon direction="forward" seconds={SKIP_SECONDS} />
+                </Pressable>
+              )}
               {showTrackButtons && (
                 <Pressable
                   hitSlop={12}
@@ -1152,7 +1218,7 @@ export default function VideoPlayer({
                     hitSlop={8}
                     disabled={atLiveEdge}
                     onPress={goToLive}
-                    style={[styles.liveBadge, atLiveEdge && styles.liveBadgeActive]}>
+                    style={[styles.liveBadge, atLiveEdge && {backgroundColor: accent}]}>
                     <View style={[styles.liveDot, atLiveEdge && styles.liveDotActive]} />
                     <Text style={styles.liveText}>EN VIVO</Text>
                   </Pressable>
@@ -1166,7 +1232,7 @@ export default function VideoPlayer({
                   <Text style={styles.timeDim}> / {formatTime(duration)}</Text>
                 </Text>
               )}
-              {!casting && (
+              {fullscreenButton && !casting && (
                 <Pressable
                   hitSlop={12}
                   style={styles.iconButton}
@@ -1211,8 +1277,9 @@ export default function VideoPlayer({
               </View>
             )}
 
-            {hasDvr && !playerError ? (
+            {seekBar && hasDvr && !playerError ? (
               <SeekBar
+                accent={accent}
                 currentTime={displayTime}
                 duration={timelineDuration}
                 buffered={isLive ? timelineDuration : buffered}
@@ -1341,6 +1408,7 @@ export default function VideoPlayer({
               </Text>
               {(['auto', ...qualityOptions] as Array<'auto' | number>).map(q => (
                 <MenuOption
+                  accent={accent}
                   key={q}
                   label={qualityLabel(q)}
                   selected={q === quality}
@@ -1364,6 +1432,7 @@ export default function VideoPlayer({
               </Text>
               {(['auto', 'on', 'off'] as DataSaver[]).map(mode => (
                 <MenuOption
+                  accent={accent}
                   key={mode}
                   label={saverLabel(mode)}
                   selected={mode === dataSaver}
@@ -1381,6 +1450,7 @@ export default function VideoPlayer({
             <>
               <MenuHeader title="Subtítulos" onBack={() => setMenu('main')} />
               <MenuOption
+                accent={accent}
                 label="Desactivados"
                 selected={subtitle === 'off'}
                 onPress={() => {
@@ -1391,6 +1461,7 @@ export default function VideoPlayer({
               />
               {textTracks.map(track => (
                 <MenuOption
+                  accent={accent}
                   key={track.index}
                   label={trackLabel(track)}
                   selected={track.index === subtitle}
@@ -1409,6 +1480,7 @@ export default function VideoPlayer({
               <MenuHeader title="Velocidad de reproducción" onBack={() => setMenu('main')} />
               {SPEEDS.map(r => (
                 <MenuOption
+                  accent={accent}
                   key={r}
                   label={speedLabel(r)}
                   selected={r === rate}
@@ -1467,16 +1539,25 @@ function MenuHeader({title, onBack}: {title: string; onBack: () => void}) {
 function MenuOption({
   label,
   selected,
+  accent,
   onPress,
 }: {
   label: string;
   selected: boolean;
+  accent: string;
   onPress: () => void;
 }) {
   return (
     <Pressable style={styles.menuItem} onPress={onPress}>
-      <Text style={[styles.menuItemText, selected && styles.menuItemActive]}>{label}</Text>
-      {selected && <Text style={styles.menuCheck}>✓</Text>}
+      <Text
+        style={[
+          styles.menuItemText,
+          selected && styles.menuItemActive,
+          selected && {color: accent},
+        ]}>
+        {label}
+      </Text>
+      {selected && <Text style={[styles.menuCheck, {color: accent}]}>✓</Text>}
     </Pressable>
   );
 }
@@ -1564,9 +1645,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 4,
     backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  liveBadgeActive: {
-    backgroundColor: '#cc0000',
   },
   liveDot: {
     width: 8,

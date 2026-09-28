@@ -154,9 +154,10 @@ export function SubtitlesIcon({
   size = 24,
   color,
   active,
-}: IconProps & {active?: boolean}) {
+  activeColor = '#3ea6ff',
+}: IconProps & {active?: boolean; activeColor?: string}) {
   return (
-    <Icon size={size} color={active ? '#3ea6ff' : color} path={PATHS.closedCaption} />
+    <Icon size={size} color={active ? activeColor : color} path={PATHS.closedCaption} />
   );
 }
 
