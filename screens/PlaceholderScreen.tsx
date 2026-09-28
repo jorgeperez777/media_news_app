@@ -1,18 +1,13 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import type {TabKey} from '../components/TabBar';
+import {t} from '../i18n';
 
-type PlaceholderTab = Exclude<TabKey, 'videos' | 'envivo'>;
+// Perfil tiene su propia pantalla (el panel de QoE); aquí solo queda Buscar.
+type PlaceholderTab = Extract<TabKey, 'buscar'>;
 
 const COPY: Record<PlaceholderTab, {title: string; body: string}> = {
-  buscar: {
-    title: 'Buscar',
-    body: 'Pestaña de ejemplo. Sirve para comprobar que el miniplayer sigue reproduciendo al cambiar de pestaña.',
-  },
-  perfil: {
-    title: 'Perfil',
-    body: 'Otra pestaña de ejemplo, igual que la anterior.',
-  },
+  buscar: {title: t('screen.searchTitle'), body: t('screen.searchBody')},
 };
 
 export default function PlaceholderScreen({tab}: {tab: PlaceholderTab}) {

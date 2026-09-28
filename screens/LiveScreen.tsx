@@ -10,6 +10,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {LIVE_CHANNELS, isLive} from '../sources';
 import {usePlayer} from '../player/PlayerContext';
+import {t} from '../i18n';
 import {MINI_HEIGHT} from '../components/PlayerHost';
 import {TAB_BAR_HEIGHT} from '../components/TabBar';
 import {LiveTvIcon, PlayIcon} from '../components/icons';
@@ -63,8 +64,8 @@ export default function LiveScreen() {
             <LiveTvIcon size={26} color="rgba(255,255,255,0.6)" />
             <Text style={styles.emptyText}>
               {isLive(player.index)
-                ? 'El canal está en el miniplayer'
-                : 'Elige un canal para empezar'}
+                ? t('screen.liveInMini')
+                : t('screen.livePick')}
             </Text>
           </View>
         )}
@@ -82,7 +83,7 @@ export default function LiveScreen() {
                 : 0),
           },
         ]}>
-        <Text style={styles.heading}>Guía de canales</Text>
+        <Text style={styles.heading}>{t('screen.liveTitle')}</Text>
 
         {LIVE_CHANNELS.map(channel => {
           const playing = player.index === channel.index;

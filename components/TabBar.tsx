@@ -7,6 +7,7 @@ import {
   SearchIcon,
   VideoLibraryIcon,
 } from './icons';
+import {t} from '../i18n';
 
 export const TAB_BAR_HEIGHT = 56;
 
@@ -17,10 +18,10 @@ const TABS: Array<{
   label: string;
   Icon: (props: {size?: number; color?: string}) => React.JSX.Element;
 }> = [
-  {key: 'envivo', label: 'TV en vivo', Icon: LiveTvIcon},
-  {key: 'videos', label: 'Vídeos', Icon: VideoLibraryIcon},
-  {key: 'buscar', label: 'Buscar', Icon: SearchIcon},
-  {key: 'perfil', label: 'Perfil', Icon: PersonIcon},
+  {key: 'envivo', label: t('tab.live'), Icon: LiveTvIcon},
+  {key: 'videos', label: t('tab.videos'), Icon: VideoLibraryIcon},
+  {key: 'buscar', label: t('tab.search'), Icon: SearchIcon},
+  {key: 'perfil', label: t('tab.profile'), Icon: PersonIcon},
 ];
 
 const ACTIVE = '#fff';

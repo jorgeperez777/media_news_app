@@ -6,6 +6,7 @@ import TabBar, {type TabKey} from './components/TabBar';
 import {PlayerProvider, usePlayer} from './player/PlayerContext';
 import {isLive} from './sources';
 import DetailScreen from './screens/DetailScreen';
+import DiagnosticsScreen from './screens/DiagnosticsScreen';
 import ListScreen from './screens/ListScreen';
 import LiveScreen from './screens/LiveScreen';
 import PlaceholderScreen from './screens/PlaceholderScreen';
@@ -56,6 +57,8 @@ function Main() {
           ) : (
             <ListScreen />
           )
+        ) : tab === 'perfil' ? (
+          <DiagnosticsScreen />
         ) : (
           <PlaceholderScreen tab={tab} />
         )}

@@ -11,6 +11,7 @@ import SOURCES from '../sources';
 import {usePlayer} from '../player/PlayerContext';
 import {TAB_BAR_HEIGHT} from './TabBar';
 import VideoPlayer from './VideoPlayer';
+import {record} from '../player/telemetry';
 import {CloseIcon, PauseIcon, PlayIcon} from './icons';
 
 /** Alto de la barra del miniplayer y ancho del vídeo dentro de ella (16:9). */
@@ -87,6 +88,7 @@ export default function PlayerHost() {
         {/* Sin `key`: cambiar de vídeo o de canal solo cambia la fuente, así el
             reproductor nativo no se recrea (ver el reset en VideoPlayer). */}
         <VideoPlayer
+          onEvent={record}
           source={current.source}
           title={current.title}
           style={styles.video}

@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react';
 import NetInfo, {type NetInfoState} from '@react-native-community/netinfo';
+import {t} from '../i18n';
 
 /**
  * Ahorro de datos: 'auto' pone tope solo fuera del Wi-Fi, 'on' lo pone siempre y
@@ -31,19 +32,19 @@ export const mbps = (bits: number) =>
 
 function networkName(state: NetInfoState | null) {
   if (!state) {
-    return 'Red desconocida';
+    return t('network.unknown');
   }
   switch (state.type) {
     case 'wifi':
-      return 'Wi-Fi';
+      return t('network.wifi');
     case 'ethernet':
-      return 'Cable';
+      return t('network.ethernet');
     case 'cellular': {
       const gen = state.details?.cellularGeneration;
-      return gen ? gen.toUpperCase() : 'Datos móviles';
+      return gen ? gen.toUpperCase() : t('network.cellular');
     }
     default:
-      return 'Red desconocida';
+      return t('network.unknown');
   }
 }
 
@@ -93,6 +94,9 @@ export default function useNetworkCap(mode: DataSaver): NetworkCap {
   return {
     bitrate,
     network: networkName(state),
-    limit: bitrate === UNLIMITED ? 'sin límite' : `hasta ${mbps(bitrate)}`,
+    limit:
+      bitrate === UNLIMITED
+        ? t('network.noLimit')
+        : t('network.limit', {rate: mbps(bitrate)}),
   };
 }

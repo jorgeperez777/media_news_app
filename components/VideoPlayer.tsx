@@ -27,14 +27,19 @@ import Video, {
   type OnExternalPlaybackChangeData,
   type OnLoadData,
   type OnProgressData,
+  type OnAudioTracksData,
   type OnTextTracksData,
   type OnVideoErrorData,
   type OnVideoTracksData,
+  type AudioTrack,
   type TextTrack,
   type ReactVideoSource,
   type VideoRef,
   type VideoTrack,
 } from 'react-native-video';
+import {t} from '../i18n';
+import {formatTime} from './format';
+import type {PlaybackEvent} from '../player/telemetry';
 import SeekBar from './SeekBar';
 import useCast from './useCast';
 import useNetworkCap, {mbps, type DataSaver} from './useNetworkCap';
@@ -150,6 +155,11 @@ type Props = {
   /** Controles que se ofrecen; por defecto, todos (ver `PlayerFeatures`). */
   features?: PlayerFeatures;
   /**
+   * Hechos de reproducción para telemetría (arranque, rebuffers, errores…). El
+   * reproductor no agrega nada: solo cuenta lo que pasa. Ver `player/telemetry`.
+   */
+  onEvent?: (event: PlaybackEvent) => void;
+  /**
    * Color de acento. Lo usan la barra de progreso y todo lo que dice "activo"
    * (CC encendido, opción elegida en ⚙, badge EN VIVO cuando vas en directo),
    * para que no haya dos colores distintos significando lo mismo.
@@ -166,14 +176,8 @@ const PREVIEW_WIDTH = 160;
 // ⏮ con más de este tiempo reproducido vuelve al inicio en vez de al anterior (como YouTube).
 const PREVIOUS_RESTART_THRESHOLD_S = 3;
 
-export function formatTime(seconds: number) {
-  const total = Math.max(0, Math.floor(seconds));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  const mm = h > 0 ? m.toString().padStart(2, '0') : m.toString();
-  return `${h > 0 ? `${h}:` : ''}${mm}:${s.toString().padStart(2, '0')}`;
-}
+// Se reexporta para quien ya lo importaba desde aquí.
+export {formatTime};
 
 export default function VideoPlayer({
   source,
@@ -196,6 +200,7 @@ export default function VideoPlayer({
   storyboard,
   features = {},
   accent = DEFAULT_ACCENT,
+  onEvent,
 }: Props) {
   const {
     skipButtons = true,
@@ -266,7 +271,7 @@ export default function VideoPlayer({
   const [controlsVisible, setControlsVisible] = useState(true);
   // Menú ⚙: principal → Calidad / Velocidad.
   const [menu, setMenu] = useState<
-    'main' | 'quality' | 'speed' | 'subtitles' | 'saver' | null
+    'main' | 'quality' | 'speed' | 'subtitles' | 'audio' | 'saver' | null
   >(null);
   // Calidad: 'auto' (ABR) o el alto en px de la variante elegida. Solo Android.
   const [videoTracks, setVideoTracks] = useState<VideoTrack[]>([]);
@@ -281,6 +286,10 @@ export default function VideoPlayer({
   // Subtítulos: pistas que anuncia el stream y la elegida ('off' = desactivados).
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
   const [subtitle, setSubtitle] = useState<'off' | number>('off');
+  // Audio: pistas que anuncia el stream y la elegida ('auto' = la del sistema, que
+  // es la que casa con el idioma del dispositivo).
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+  const [audioTrack, setAudioTrack] = useState<'auto' | number>('auto');
   // Última pista encendida, para que el botón CC la recupere al volver a activarlos.
   const lastSubtitle = useRef<number | null>(null);
   if (subtitle !== 'off') {
@@ -330,8 +339,8 @@ export default function VideoPlayer({
     ) {
       return;
     }
-    const t = setTimeout(() => setControlsVisible(false), AUTO_HIDE_MS);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setControlsVisible(false), AUTO_HIDE_MS);
+    return () => clearTimeout(timer);
   }, [
     controlsVisible,
     paused,
@@ -390,6 +399,19 @@ export default function VideoPlayer({
     typeof source === 'object' && source !== null && 'uri' in source
       ? (source as {uri?: string}).uri
       : undefined;
+
+  // Telemetría. El callback se lee por ref para que cambiarlo no reabra sesiones.
+  const onEventRef = useRef(onEvent);
+  onEventRef.current = onEvent;
+  const emitEvent = useCallback((event: PlaybackEvent) => {
+    onEventRef.current?.(event);
+  }, []);
+  const titleRef = useRef(title);
+  titleRef.current = title;
+  // Cada fuente nueva (también la primera) abre una sesión de medición.
+  useEffect(() => {
+    emitEvent({type: 'start', title: titleRef.current ?? sourceUri ?? ''});
+  }, [emitEvent, sourceUri]);
   // Cambiar de vídeo o de canal ya no remonta el reproductor (así ExoPlayer/AVPlayer
   // no se recrean), así que hay que limpiar a mano lo que era del medio anterior.
   // `firstSource` evita hacerlo en el primer render, donde no hay nada que limpiar.
@@ -413,6 +435,8 @@ export default function VideoPlayer({
     setTextTracks([]);
     setSubtitle('off');
     lastSubtitle.current = null;
+    setAudioTracks([]);
+    setAudioTrack('auto');
     setPlayerError(null);
     setRetryAttempt(0);
     setRetryCountdown(null);
@@ -521,11 +545,12 @@ export default function VideoPlayer({
       }
       videoRef.current?.seek(clamped);
       setCurrentTime(clamped);
+      emitEvent({type: 'seek'});
       if (ended && clamped < duration) {
         setEnded(false);
       }
     },
-    [cast, casting, duration, ended, isLive, seekableDuration],
+    [cast, casting, duration, emitEvent, ended, isLive, seekableDuration],
   );
 
   // Vuelve a la posición live del reproductor (currentTime + liveOffset) y reanuda.
@@ -677,6 +702,9 @@ export default function VideoPlayer({
     if (data.textTracks?.length) {
       setTextTracks(data.textTracks);
     }
+    if (data.audioTracks?.length) {
+      setAudioTracks(data.audioTracks);
+    }
     // Cargó tras un reintento: reanudar donde estábamos (o al directo).
     if (playerKey > 0) {
       if (resumeToLiveRef.current || data.isLive) {
@@ -697,10 +725,14 @@ export default function VideoPlayer({
     setBuffering(false);
     setPlayerError(message);
     setControlsVisible(true);
+    emitEvent({type: 'error', message});
     onError?.(message);
   };
 
   const onVideoTracks = (data: OnVideoTracksData) => setVideoTracks(data.videoTracks);
+  const onAudioTracks = (data: OnAudioTracksData) => {
+    setAudioTracks(data.audioTracks ?? []);
+  };
   const onTextTracks = (data: OnTextTracksData) => setTextTracks(data.textTracks);
 
   const onProgress = (data: OnProgressData) => {
@@ -714,9 +746,13 @@ export default function VideoPlayer({
       setIsLive(data.isLive);
     }
     setLiveOffset(data.liveOffset ?? -1);
+    emitEvent({type: 'progress', seconds: data.currentTime});
   };
 
-  const onBuffer = (data: OnBufferData) => setBuffering(data.isBuffering);
+  const onBuffer = (data: OnBufferData) => {
+    setBuffering(data.isBuffering);
+    emitEvent({type: 'buffer', buffering: data.isBuffering});
+  };
 
   const onEnd = () => {
     if (autoplayNext && hasNext && onNext) {
@@ -727,6 +763,7 @@ export default function VideoPlayer({
     setPaused(true);
     setCurrentTime(duration);
     showControls();
+    emitEvent({type: 'end'});
   };
 
   // ⏮: en VOD reinicia si ya llevamos unos segundos; si no (o en directo), va al anterior.
@@ -752,31 +789,48 @@ export default function VideoPlayer({
 
   // Alturas únicas disponibles (1080, 720, …) de mayor a menor.
   const qualityOptions = Array.from(
-    new Set(videoTracks.map(t => t.height ?? 0).filter(h => h > 0)),
+    new Set(videoTracks.map(track => track.height ?? 0).filter(h => h > 0)),
   ).sort((a, b) => b - a);
-  const playingHeight = videoTracks.find(t => t.selected)?.height;
+  const playingHeight = videoTracks.find(track => track.selected)?.height;
   const qualityLabel = (q: 'auto' | number) =>
     q === 'auto'
-      ? `Auto${playingHeight ? ` (${playingHeight}p)` : ''}`
-      : `${q}p`;
-  const speedLabel = (r: number) => (r === 1 ? 'Normal' : `${r}x`);
+      ? playingHeight
+        ? t('quality.autoAt', {height: playingHeight})
+        : t('quality.auto')
+      : t('quality.height', {height: q});
+  const speedLabel = (r: number) =>
+    r === 1 ? t('speed.normal') : t('speed.rate', {rate: r});
   const saverLabel = (mode: DataSaver) =>
     mode === 'auto'
-      ? 'Automático'
+      ? t('saver.auto')
       : mode === 'on'
-      ? 'Siempre activado'
-      : 'Desactivado';
+      ? t('saver.on')
+      : t('saver.off');
   // iOS puede anunciar pistas con título vacío (AVPlayer expone la opción legible
   // aunque el stream no traiga subtítulos), así que no vale `??`: hay que caer al
   // idioma o al número también con cadena vacía.
-  const trackLabel = (track: TextTrack) =>
-    track.title || track.language || `Pista ${track.index + 1}`;
+  const trackLabel = (track: {
+    title?: string;
+    language?: string;
+    index: number;
+  }) =>
+    track.title ||
+    track.language ||
+    t('track.fallback', {number: track.index + 1});
+  const audioLabel = () => {
+    if (audioTrack === 'auto') {
+      const playing = audioTracks.find(track => track.selected);
+      return playing ? trackLabel(playing) : t('audio.default');
+    }
+    const track = audioTracks.find(item => item.index === audioTrack);
+    return track ? trackLabel(track) : t('audio.default');
+  };
   const subtitleLabel = () => {
     if (subtitle === 'off') {
-      return 'Desactivados';
+      return t('subtitles.off');
     }
-    const track = textTracks.find(t => t.index === subtitle);
-    return track ? trackLabel(track) : 'Desactivados';
+    const track = textTracks.find(item => item.index === subtitle);
+    return track ? trackLabel(track) : t('subtitles.off');
   };
   // El botón CC alterna entre apagado y la última pista elegida (o la primera).
   const toggleSubtitles = () => {
@@ -901,11 +955,22 @@ export default function VideoPlayer({
         onBuffer={onBuffer}
         onVideoTracks={onVideoTracks}
         onTextTracks={onTextTracks}
+        onAudioTracks={onAudioTracks}
+        selectedAudioTrack={
+          audioTrack === 'auto'
+            ? {type: SelectedTrackType.SYSTEM}
+            : {type: SelectedTrackType.INDEX, value: audioTrack}
+        }
         // Tope de datos: solo manda con calidad automática; si el usuario ha fijado
         // una resolución a mano, su elección gana. 0 = sin tope.
         maxBitRate={quality === 'auto' ? networkCap.bitrate : 0}
         reportBandwidth
-        onBandwidthUpdate={e => setBandwidth(e.bitrate ?? 0)}
+        onBandwidthUpdate={e => {
+          setBandwidth(e.bitrate ?? 0);
+          emitEvent({type: 'bitrate', bps: e.bitrate ?? 0});
+        }}
+        // Primer fotograma en pantalla: cierra la medición del arranque.
+        onReadyForDisplay={() => emitEvent({type: 'ready', live: isLive})}
         selectedTextTrack={
           subtitle === 'off'
             ? {type: SelectedTrackType.DISABLED}
@@ -927,6 +992,8 @@ export default function VideoPlayer({
           los maneja quien nos envuelve, así que aquí no se pinta nada más que el vídeo. */}
       {!compact && (
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.surface')}
           style={StyleSheet.absoluteFill}
           onPress={onSurfacePress}
           // Pressable no llama a onPress si ya disparó el pulsado largo, así que el
@@ -950,7 +1017,9 @@ export default function VideoPlayer({
                 {title ?? ''}
               </Text>
               <Text style={styles.castDevice} numberOfLines={1}>
-                {`Reproduciendo en ${airplay.deviceName ?? 'AirPlay'}`}
+                {t('airplay.playingOn', {
+                  device: airplay.deviceName ?? t('airplay.name'),
+                })}
               </Text>
             </>
           )}
@@ -970,8 +1039,8 @@ export default function VideoPlayer({
               </Text>
               <Text style={styles.castDevice} numberOfLines={1}>
                 {cast.loadError
-                  ? `No se pudo transmitir: ${cast.loadError}`
-                  : `Transmitiendo a ${cast.deviceName}`}
+                  ? t('cast.failed', {error: cast.loadError})
+                  : t('cast.playingOn', {device: cast.deviceName})}
               </Text>
             </>
           )}
@@ -1013,7 +1082,7 @@ export default function VideoPlayer({
       {/* Aviso de red caída (sin error todavía: ExoPlayer/AVPlayer siguen reintentando) */}
       {!online && !playerError && (
         <View pointerEvents="none" style={styles.offlineBanner}>
-          <Text style={styles.offlineText}>Sin conexión · reconectando…</Text>
+          <Text style={styles.offlineText}>{t('offline.banner')}</Text>
         </View>
       )}
 
@@ -1021,16 +1090,20 @@ export default function VideoPlayer({
       {playerError && (
         <View style={styles.errorOverlay}>
           <Text style={styles.errorTitle}>
-            {online ? 'No se pudo reproducir el vídeo' : 'Sin conexión a internet'}
+            {online ? t('error.title') : t('error.offlineTitle')}
           </Text>
           <Text style={styles.errorDetail} numberOfLines={2}>
-            {online ? playerError : 'Se reintentará automáticamente al recuperar la red'}
+            {online ? playerError : t('error.offlineDetail')}
           </Text>
           <Pressable
             style={({pressed}) => [styles.retryButton, pressed && styles.dimmed]}
-            onPress={() => setRetryNow(n => n + 1)}>
+            onPress={() => setRetryNow(n => n + 1)}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.retry')}>
             <Text style={styles.retryText}>
-              {retryCountdown !== null ? `Reintentar (${retryCountdown} s)` : 'Reintentar'}
+              {retryCountdown !== null
+                ? t('error.retryIn', {seconds: retryCountdown})
+                : t('error.retry')}
             </Text>
           </Pressable>
         </View>
@@ -1065,6 +1138,8 @@ export default function VideoPlayer({
             {/* ⌄ minimizar: solo cuando hay miniplayer y no estamos en pantalla completa. */}
             {onMinimize && !fullscreen && (
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.minimize')}
                 hitSlop={12}
                 style={styles.iconButton}
                 onPress={() => {
@@ -1093,6 +1168,11 @@ export default function VideoPlayer({
               {/* CC: atajo para encender/apagar; la pista se elige en ⚙. */}
               {subtitlesButton && !playerError && !casting && textTracks.length > 0 && (
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    subtitle === 'off' ? t('a11y.subtitlesOff') : t('a11y.subtitlesOn')
+                  }
+                  accessibilityState={{selected: subtitle !== 'off'}}
                   hitSlop={12}
                   style={styles.iconButton}
                   onPress={toggleSubtitles}>
@@ -1106,7 +1186,9 @@ export default function VideoPlayer({
                   onPress={() => {
                     videoRef.current?.enterPictureInPicture();
                     touch();
-                  }}>
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.pip')}>
                   <PipIcon />
                 </Pressable>
               )}
@@ -1117,7 +1199,9 @@ export default function VideoPlayer({
                   onPress={() => {
                     setMenu('main');
                     touch();
-                  }}>
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.settings')}>
                   <SettingsIcon />
                 </Pressable>
               )}
@@ -1142,7 +1226,9 @@ export default function VideoPlayer({
                       styles.dimmed,
                   ]}
                   disabled={isLive && !hasPrevious}
-                  onPress={goPrevious}>
+                  onPress={goPrevious}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.previous')}>
                   <TrackIcon direction="previous" />
                 </Pressable>
               )}
@@ -1151,7 +1237,9 @@ export default function VideoPlayer({
                   hitSlop={12}
                   style={[styles.iconButton, !canSkip && styles.hidden]}
                   disabled={!canSkip}
-                  onPress={() => skip('left', false)}>
+                  onPress={() => skip('left', false)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.back', {seconds: SKIP_SECONDS})}>
                   <SkipIcon direction="back" seconds={SKIP_SECONDS} />
                 </Pressable>
               )}
@@ -1159,7 +1247,15 @@ export default function VideoPlayer({
                 hitSlop={12}
                 style={[styles.playButton, uiBuffering && styles.hidden]}
                 disabled={uiBuffering}
-                onPress={togglePlay}>
+                onPress={togglePlay}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  ended && !casting
+                    ? t('a11y.replay')
+                    : uiPaused
+                    ? t('a11y.play')
+                    : t('a11y.pause')
+                }>
                 {ended && !casting ? (
                   <ReplayIcon size={40} />
                 ) : uiPaused ? (
@@ -1173,7 +1269,9 @@ export default function VideoPlayer({
                   hitSlop={12}
                   style={[styles.iconButton, !canSkip && styles.hidden]}
                   disabled={!canSkip}
-                  onPress={() => skip('right', false)}>
+                  onPress={() => skip('right', false)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.forward', {seconds: SKIP_SECONDS})}>
                   <SkipIcon direction="forward" seconds={SKIP_SECONDS} />
                 </Pressable>
               )}
@@ -1185,7 +1283,9 @@ export default function VideoPlayer({
                   onPress={() => {
                     onNext?.();
                     touch();
-                  }}>
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.next')}>
                   <TrackIcon direction="next" />
                 </Pressable>
               )}
@@ -1196,7 +1296,9 @@ export default function VideoPlayer({
                   onPress={() => {
                     cast.stop();
                     touch();
-                  }}>
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.stopCast')}>
                   <StopIcon size={22} />
                 </Pressable>
               )}
@@ -1215,19 +1317,29 @@ export default function VideoPlayer({
                 <View style={styles.liveRow} pointerEvents="box-none">
                   {/* Rojo en directo; gris cuando vas atrasado (tap = volver al directo) */}
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      atLiveEdge ? t('a11y.atLive') : t('a11y.goLive')
+                    }
+                    accessibilityState={{disabled: atLiveEdge}}
                     hitSlop={8}
                     disabled={atLiveEdge}
                     onPress={goToLive}
                     style={[styles.liveBadge, atLiveEdge && {backgroundColor: accent}]}>
                     <View style={[styles.liveDot, atLiveEdge && styles.liveDotActive]} />
-                    <Text style={styles.liveText}>EN VIVO</Text>
+                    <Text style={styles.liveText}>{t('live.badge')}</Text>
                   </Pressable>
                   {!atLiveEdge && displayLiveOffset >= 0 && (
                     <Text style={styles.time}>-{formatTime(displayLiveOffset)}</Text>
                   )}
                 </View>
               ) : (
-                <Text style={styles.time}>
+                <Text
+                  style={styles.time}
+                  accessibilityLabel={t('a11y.position', {
+                    position: formatTime(displayTime),
+                    duration: formatTime(duration),
+                  })}>
                   {formatTime(displayTime)}
                   <Text style={styles.timeDim}> / {formatTime(duration)}</Text>
                 </Text>
@@ -1239,7 +1351,11 @@ export default function VideoPlayer({
                   onPress={() => {
                     setFullscreen(f => !f);
                     touch();
-                  }}>
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    fullscreen ? t('a11y.fullscreenExit') : t('a11y.fullscreenEnter')
+                  }>
                   <FullscreenIcon exit={fullscreen} />
                 </Pressable>
               )}
@@ -1284,18 +1400,18 @@ export default function VideoPlayer({
                 duration={timelineDuration}
                 buffered={isLive ? timelineDuration : buffered}
                 scrubbing={scrubbing}
-                onScrubStart={t => {
+                onScrubStart={time => {
                   setScrubbing(true);
-                  setScrubTime(t);
+                  setScrubTime(time);
                 }}
                 onScrub={setScrubTime}
-                onScrubEnd={t => {
+                onScrubEnd={time => {
                   setScrubbing(false);
                   // Soltar cerca de la posición live = volver al directo.
-                  if (isLive && livePosition - t <= LIVE_EDGE_TOLERANCE_S) {
+                  if (isLive && livePosition - time <= LIVE_EDGE_TOLERANCE_S) {
                     goToLive();
                   } else {
-                    seekTo(t);
+                    seekTo(time);
                     touch();
                   }
                 }}
@@ -1310,7 +1426,7 @@ export default function VideoPlayer({
               <View style={styles.castDeviceRow} pointerEvents="none">
                 <AirPlayGlyph size={18} color="rgba(255,255,255,0.8)" />
                 <Text style={styles.castDeviceRowText} numberOfLines={1}>
-                  {airplay.deviceName ?? 'AirPlay'}
+                  {airplay.deviceName ?? t('airplay.name')}
                 </Text>
               </View>
             )}
@@ -1321,11 +1437,13 @@ export default function VideoPlayer({
                 onPress={() => {
                   cast.showRemoteControls();
                   touch();
-                }}>
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.castControls')}>
                 <CastIcon size={18} color="rgba(255,255,255,0.8)" connected />
                 <Text style={styles.castDeviceRowText} numberOfLines={1}>
                   {cast.loadError
-                    ? `No se pudo transmitir: ${cast.loadError}`
+                    ? t('cast.failed', {error: cast.loadError})
                     : cast.deviceName}
                 </Text>
               </Pressable>
@@ -1347,24 +1465,24 @@ export default function VideoPlayer({
           {menu === 'main' && (
             <>
               <MenuRow
-                label="Calidad"
+                label={t('menu.quality')}
                 value={
                   casting
-                    ? 'La elige el Chromecast'
+                    ? t('value.castChooses')
                     : qualityOptions.length
                     ? qualityLabel(quality)
-                    : 'No disponible'
+                    : t('value.unavailable')
                 }
                 disabled={casting || !qualityOptions.length}
                 onPress={() => setMenu('quality')}
               />
               <MenuRow
-                label="Ahorro de datos"
+                label={t('menu.saver')}
                 value={
                   casting
-                    ? 'No disponible al transmitir'
+                    ? t('value.unavailableCasting')
                     : quality !== 'auto'
-                    ? `${saverLabel(dataSaver)} · sin efecto: calidad fija`
+                    ? `${saverLabel(dataSaver)} · ${t('saver.noEffect')}`
                     : `${saverLabel(dataSaver)} · ${networkCap.network}: ${
                         networkCap.limit
                       }`
@@ -1373,24 +1491,36 @@ export default function VideoPlayer({
                 onPress={() => setMenu('saver')}
               />
               <MenuRow
-                label="Subtítulos"
+                label={t('menu.subtitles')}
                 value={
                   casting
-                    ? 'No disponible al transmitir'
+                    ? t('value.unavailableCasting')
                     : textTracks.length
                     ? subtitleLabel()
-                    : 'No disponible'
+                    : t('value.unavailable')
                 }
                 disabled={casting || !textTracks.length}
                 onPress={() => setMenu('subtitles')}
               />
               <MenuRow
-                label="Velocidad de reproducción"
+                label={t('menu.audio')}
                 value={
                   casting
-                    ? 'No disponible al transmitir'
+                    ? t('value.unavailableCasting')
+                    : audioTracks.length > 1
+                    ? audioLabel()
+                    : t('value.unavailable')
+                }
+                disabled={casting || audioTracks.length < 2}
+                onPress={() => setMenu('audio')}
+              />
+              <MenuRow
+                label={t('menu.speed')}
+                value={
+                  casting
+                    ? t('value.unavailableCasting')
                     : isLive
-                    ? 'No disponible en directo'
+                    ? t('value.unavailableLive')
                     : speedLabel(rate)
                 }
                 disabled={casting || isLive}
@@ -1401,10 +1531,10 @@ export default function VideoPlayer({
 
           {menu === 'quality' && (
             <>
-              <MenuHeader title="Calidad" onBack={() => setMenu('main')} />
+              <MenuHeader title={t('menu.quality')} onBack={() => setMenu('main')} />
               <Text style={styles.menuNote}>
                 {networkCap.network}: {networkCap.limit}
-                {bandwidth > 0 ? ` · red estimada en ${mbps(bandwidth)}` : ''}
+                {bandwidth > 0 ? t('saver.bandwidth', {rate: mbps(bandwidth)}) : ''}
               </Text>
               {(['auto', ...qualityOptions] as Array<'auto' | number>).map(q => (
                 <MenuOption
@@ -1424,12 +1554,8 @@ export default function VideoPlayer({
 
           {menu === 'saver' && (
             <>
-              <MenuHeader title="Ahorro de datos" onBack={() => setMenu('main')} />
-              <Text style={styles.menuNote}>
-                Limita el bitrate cuando no estás en Wi-Fi. La calidad sigue
-                ajustándose sola por debajo del tope, y no se aplica si eliges una
-                resolución a mano.
-              </Text>
+              <MenuHeader title={t('menu.saver')} onBack={() => setMenu('main')} />
+              <Text style={styles.menuNote}>{t('menu.saverHint')}</Text>
               {(['auto', 'on', 'off'] as DataSaver[]).map(mode => (
                 <MenuOption
                   accent={accent}
@@ -1448,10 +1574,10 @@ export default function VideoPlayer({
 
           {menu === 'subtitles' && (
             <>
-              <MenuHeader title="Subtítulos" onBack={() => setMenu('main')} />
+              <MenuHeader title={t('menu.subtitles')} onBack={() => setMenu('main')} />
               <MenuOption
                 accent={accent}
-                label="Desactivados"
+                label={t('subtitles.off')}
                 selected={subtitle === 'off'}
                 onPress={() => {
                   setSubtitle('off');
@@ -1475,9 +1601,41 @@ export default function VideoPlayer({
             </>
           )}
 
+          {menu === 'audio' && (
+            <>
+              <MenuHeader title={t('menu.audio')} onBack={() => setMenu('main')} />
+              <MenuOption
+                accent={accent}
+                label={t('audio.default')}
+                selected={audioTrack === 'auto'}
+                onPress={() => {
+                  setAudioTrack('auto');
+                  setMenu(null);
+                  touch();
+                }}
+              />
+              {audioTracks.map(track => (
+                <MenuOption
+                  accent={accent}
+                  key={track.index}
+                  label={trackLabel(track)}
+                  selected={track.index === audioTrack}
+                  onPress={() => {
+                    setAudioTrack(track.index);
+                    setMenu(null);
+                    touch();
+                  }}
+                />
+              ))}
+            </>
+          )}
+
           {menu === 'speed' && (
             <>
-              <MenuHeader title="Velocidad de reproducción" onBack={() => setMenu('main')} />
+              <MenuHeader
+                title={t('menu.speed')}
+                onBack={() => setMenu('main')}
+              />
               {SPEEDS.map(r => (
                 <MenuOption
                   accent={accent}

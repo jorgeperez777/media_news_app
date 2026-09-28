@@ -1,5 +1,7 @@
 import React, {useRef} from 'react';
 import {PanResponder, StyleSheet, View} from 'react-native';
+import {t} from '../i18n';
+import {formatTime} from './format';
 
 type Props = {
   currentTime: number;
@@ -11,6 +13,8 @@ type Props = {
   onScrubEnd: (time: number) => void;
   /** Color de la parte reproducida y del tirador. */
   accent?: string;
+  /** Salto de los gestos de accesibilidad (incrementar/decrementar), en segundos. */
+  step?: number;
 };
 
 const TRACK_HEIGHT = 3;
@@ -19,7 +23,14 @@ const THUMB = 12;
 const THUMB_ACTIVE = 18;
 
 export default function SeekBar(props: Props) {
-  const {currentTime, duration, buffered, scrubbing, accent = '#ff0000'} = props;
+  const {
+    currentTime,
+    duration,
+    buffered,
+    scrubbing,
+    accent = '#ff0000',
+    step = 10,
+  } = props;
   const widthRef = useRef(1);
   const startXRef = useRef(0);
   // Los handlers se leen a través de un ref para que el PanResponder (creado
@@ -63,6 +74,27 @@ export default function SeekBar(props: Props) {
       style={styles.touchArea}
       onLayout={e => {
         widthRef.current = e.nativeEvent.layout.width || 1;
+      }}
+      // Con lector de pantalla no hay arrastre: el control se vuelve «ajustable» y
+      // se mueve con los gestos de incrementar/decrementar del sistema.
+      accessible
+      accessibilityRole="adjustable"
+      accessibilityLabel={t('a11y.seekBar')}
+      accessibilityHint={t('a11y.seekBarHint')}
+      accessibilityValue={{
+        min: 0,
+        max: Math.max(1, Math.round(duration)),
+        now: Math.round(currentTime),
+        text: t('a11y.position', {
+          position: formatTime(currentTime),
+          duration: formatTime(duration),
+        }),
+      }}
+      accessibilityActions={[{name: 'increment'}, {name: 'decrement'}]}
+      onAccessibilityAction={event => {
+        const delta = event.nativeEvent.actionName === 'increment' ? step : -step;
+        const next = Math.max(0, Math.min(duration || 0, currentTime + delta));
+        propsRef.current.onScrubEnd(next);
       }}
       {...pan.panHandlers}>
       <View style={[styles.track, {height: trackHeight}]}>
