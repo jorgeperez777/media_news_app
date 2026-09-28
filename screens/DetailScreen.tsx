@@ -72,7 +72,8 @@ export default function DetailScreen() {
         <Text style={styles.description}>{current.description}</Text>
         <Text style={styles.hint}>
           Tap: mostrar/ocultar controles · Doble tap en los lados: ±10 s ·
-          Arrastra la barra roja para buscar · ⏮ ⏭ cambian de vídeo (
+          Mantén pulsado: x2 mientras no sueltes · Arrastra la barra roja para
+          buscar · ⏮ ⏭ cambian de vídeo (
           {VOD_ITEMS.findIndex(item => item.index === index) + 1}/
           {VOD_ITEMS.length}) · ⌄ (junto al título) manda el vídeo al miniplayer
         </Text>

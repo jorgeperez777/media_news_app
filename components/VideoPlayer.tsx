@@ -43,6 +43,7 @@ import {
   AirPlayGlyph,
   CastIcon,
   ChevronIcon,
+  FastForwardIcon,
   FullscreenIcon,
   StopIcon,
   PipIcon,
@@ -61,6 +62,11 @@ const DOUBLE_TAP_MS = 300;
 const SKIP_CHAIN_MS = 800;
 const AUTO_HIDE_MS = 3000;
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+// Mantener pulsado el vídeo acelera la reproducción hasta soltar (como TikTok).
+const BOOST_RATE = 2;
+// Umbral del pulsado largo. Por encima de la ventana de doble tap, para que un
+// tap que se demora no acelere sin querer.
+const BOOST_HOLD_MS = 400;
 // Por debajo de este retraso (respecto a la posición live del reproductor) se
 // considera que estás "en directo".
 const LIVE_EDGE_TOLERANCE_S = 5;
@@ -178,6 +184,10 @@ export default function VideoPlayer({
   const [buffered, setBuffered] = useState(0);
   const [buffering, setBuffering] = useState(false);
   const [rate, setRate] = useState(1);
+  // Aceleración por pulsado largo: se activa mientras el dedo siga abajo, así que
+  // el ref es quien decide en onPressOut (el estado solo pinta el aviso).
+  const [boosting, setBoosting] = useState(false);
+  const boostingRef = useRef(false);
   // Directo: isLive viene de onLoad/onProgress (campo añadido a la librería);
   // liveOffset son los segundos por detrás del borde del directo (-1 = desconocido).
   const [isLive, setIsLive] = useState(false);
@@ -567,6 +577,41 @@ export default function VideoPlayer({
     }, DOUBLE_TAP_MS);
   };
 
+  // Mantener pulsado: x2 mientras el dedo siga abajo, como en TikTok. No en directo
+  // (correríamos hasta el borde del directo y solo conseguiríamos un atasco) ni
+  // transmitiendo (ahí la velocidad la manda el receptor).
+  const canBoost = !isLive && !casting && !playerError && !paused && !ended;
+  // Si en ⚙ ya había puesto algo más rápido, su elección gana: acelerar nunca frena.
+  const boostRate = Math.max(rate, BOOST_RATE);
+
+  const startBoost = () => {
+    if (!canBoost) {
+      return;
+    }
+    boostingRef.current = true;
+    setBoosting(true);
+    // Los controles estorban justo cuando quieres ver pasar el vídeo: se van (y al
+    // soltar se quedan así, como en YouTube; un tap los devuelve).
+    setControlsVisible(false);
+  };
+
+  const endBoost = () => {
+    if (!boostingRef.current) {
+      return;
+    }
+    boostingRef.current = false;
+    setBoosting(false);
+  };
+
+  // Si acelerar deja de tener sentido con el dedo todavía abajo (terminó el vídeo,
+  // llegó un error, pausaron desde la notificación), volver a la velocidad normal.
+  useEffect(() => {
+    if (boosting && !canBoost) {
+      boostingRef.current = false;
+      setBoosting(false);
+    }
+  }, [boosting, canBoost]);
+
   const onLoad = (data: OnLoadData) => {
     setDuration(data.duration);
     setIsLive(!!data.isLive);
@@ -774,7 +819,7 @@ export default function VideoPlayer({
         source={source}
         style={StyleSheet.absoluteFill}
         paused={paused}
-        rate={rate}
+        rate={boosting ? boostRate : rate}
         resizeMode="contain"
         controls={false}
         // Android: sin esta prop la librería usa la política por defecto de ExoPlayer
@@ -823,10 +868,18 @@ export default function VideoPlayer({
         onError={onPlayerError}
       />
 
-      {/* Superficie táctil: tap / doble tap. En miniplayer los gestos los maneja quien
-          nos envuelve, así que aquí no se pinta nada más que el vídeo. */}
+      {/* Superficie táctil: tap, doble tap y pulsado largo. En miniplayer los gestos
+          los maneja quien nos envuelve, así que aquí no se pinta nada más que el vídeo. */}
       {!compact && (
-        <Pressable style={StyleSheet.absoluteFill} onPress={onSurfacePress} />
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onSurfacePress}
+          // Pressable no llama a onPress si ya disparó el pulsado largo, así que el
+          // x2 no choca con el tap ni con el doble tap de ±10 s.
+          delayLongPress={BOOST_HOLD_MS}
+          onLongPress={startBoost}
+          onPressOut={endBoost}
+        />
       )}
 
       {/* AirPlay: el vídeo se ve en la tele; aquí queda el estado (los controles siguen
@@ -884,6 +937,14 @@ export default function VideoPlayer({
             {skipHint.side === 'left' ? '◀◀' : '▶▶'}
           </Text>
           <Text style={styles.skipHintText}>{skipHint.seconds} s</Text>
+        </View>
+      )}
+
+      {/* Aceleración mientras se mantiene pulsado */}
+      {boosting && (
+        <View pointerEvents="none" style={styles.boostBadge}>
+          <FastForwardIcon size={16} />
+          <Text style={styles.boostText}>{`${boostRate}x`}</Text>
         </View>
       )}
 
@@ -1535,6 +1596,19 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   offlineText: {color: '#fff', fontSize: 12, fontWeight: '600'},
+  boostBadge: {
+    position: 'absolute',
+    top: 8,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  boostText: {color: '#fff', fontSize: 13, fontWeight: '700'},
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.85)',

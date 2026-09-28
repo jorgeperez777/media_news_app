@@ -31,6 +31,7 @@ const PATHS = {
   close:
     'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
   chevronDown: 'M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z',
+  fastForward: 'M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z',
   skipNext: 'M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z',
   skipPrevious: 'M6 6h2v12H6zm3.5 6 8.5 6V6z',
   fullscreen:
@@ -116,6 +117,10 @@ export function FullscreenIcon({
       path={exit ? PATHS.fullscreenExit : PATHS.fullscreen}
     />
   );
+}
+
+export function FastForwardIcon({size = 24, color}: IconProps) {
+  return <Icon size={size} color={color} path={PATHS.fastForward} />;
 }
 
 export function PipIcon({size = 24, color}: IconProps) {

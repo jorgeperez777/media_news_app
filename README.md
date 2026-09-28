@@ -154,6 +154,7 @@ geometría de Material Symbols: un viewBox 24×24 común, color y tamaño por pr
 | ⌄ (arriba izquierda, junto al título) | Manda el vídeo al miniplayer (solo si el contenedor pasa `onMinimize`) |
 | Tap en el vídeo | Muestra/oculta los controles (se ocultan solos a los 3 s) |
 | Doble tap izquierda/derecha | −10 s / +10 s; taps seguidos acumulan (20 s, 30 s…) |
+| Mantener pulsado el vídeo | x2 mientras no sueltes (ver [Acelerar manteniendo pulsado](#acelerar-manteniendo-pulsado-x2)) |
 | Botones centrales | ⏮ · ⟲10 · Play/Pause/Replay · ⟳10 · ⏭ (⏮/⏭ cuando hay lista, también en directo; en VOD ⏮ reinicia si llevas > 3 s, como YouTube) |
 | Fin del vídeo | Autoplay del siguiente de la lista (`autoplayNext`, por defecto `true`); sin siguiente, icono de Replay |
 | Barra roja inferior | Arrastrable (scrubbing) con buffer en gris; mini barra cuando los controles están ocultos |
@@ -164,6 +165,29 @@ geometría de Material Symbols: un viewBox 24×24 común, color y tamaño por pr
 | Spinner | Mientras hace buffering |
 | ▭ (arriba derecha, junto a ⚙) | Picture in Picture manual; también entra solo al salir de la app (`enterPictureInPictureOnLeave`). Solo aparece donde el dispositivo lo soporta |
 | Botón de cast / AirPlay (arriba derecha) | Envía el vídeo a un Chromecast o a AirPlay (ver [Chromecast y AirPlay](#chromecast-y-airplay)) |
+
+### Acelerar manteniendo pulsado (x2)
+
+Como en TikTok: mantén el dedo en cualquier lado del vídeo y va al doble de
+velocidad; al soltar vuelve a la de antes. El umbral son 400 ms
+(`BOOST_HOLD_MS`), por encima de la ventana de doble tap, para que un tap que se
+demora no acelere sin querer; `Pressable` no llama a `onPress` si ya disparó el
+pulsado largo, así que el gesto no se pisa con el tap ni con los ±10 s.
+
+Detalles de comportamiento:
+
+- Mientras acelera, los controles se ocultan (estorban justo cuando quieres ver
+  pasar el vídeo) y sale un aviso **⏩ 2x** arriba. Al soltar se quedan ocultos,
+  como en YouTube: un tap los devuelve.
+- Si en ⚙ ya habías elegido algo más rápido, gana tu elección
+  (`Math.max(rate, BOOST_RATE)`): acelerar nunca frena.
+- No se activa en directo (correríamos hasta el borde del directo para acabar
+  atascados), ni transmitiendo a Chromecast (la velocidad la manda el receptor),
+  ni con el vídeo en pausa, terminado o en error. Si alguna de esas cosas pasa
+  con el dedo todavía abajo, la velocidad vuelve sola a la normal.
+- Es solo la prop `rate` del `<Video>`, así que no hay nada nativo nuevo: en
+  Android lo aplica ExoPlayer y en iOS AVPlayer, y el audio sigue sonando
+  (corregido de tono en ambos).
 
 ### Vista previa en la barra (storyboard)
 
