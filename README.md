@@ -145,6 +145,10 @@ Dos cosas que conviene no confundir al medir:
 
 ## Controles estilo YouTube
 
+> Referencia completa del componente (props, `features`, `accent`, gestos, storyboard,
+> PiP, cast, errores y recetas) en **[`docs/index.html`](docs/index.html)** —
+> `open docs/index.html`.
+
 `components/VideoPlayer.tsx` envuelve `<Video controls={false}>` con un overlay
 propio. Los iconos son SVG (`components/icons.tsx`, con `react-native-svg`) sobre la
 geometría de Material Symbols: un viewBox 24×24 común, color y tamaño por prop:

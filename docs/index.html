@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VideoPlayer · Documentación</title>
+<meta name="description" content="Parámetros y uso del componente VideoPlayer (overlay sobre react-native-video).">
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #181818;
+    --surface-2: #212121;
+    --line: #303030;
+    --text: #f1f1f1;
+    --muted: #aaaaaa;
+    --accent: #ff0000;
+    --accent-soft: rgba(255, 0, 0, 0.12);
+    --code: #ffd9a0;
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #ffffff;
+      --surface: #f7f7f7;
+      --surface-2: #eeeeee;
+      --line: #dddddd;
+      --text: #0f0f0f;
+      --muted: #606060;
+      --accent-soft: rgba(255, 0, 0, 0.08);
+      --code: #9a4b00;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  code { color: var(--code); font-size: 0.92em; }
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  pre code { color: inherit; }
+  .layout { display: flex; gap: 32px; max-width: 1180px; margin: 0 auto; padding: 0 16px 80px; }
+  nav {
+    position: sticky; top: 0; align-self: flex-start;
+    width: 220px; flex: none; padding: 28px 0;
+    max-height: 100vh; overflow-y: auto;
+  }
+  nav p { margin: 18px 0 8px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  nav a {
+    display: block; padding: 5px 10px; border-radius: 8px;
+    color: var(--muted); text-decoration: none; font-size: 13.5px;
+  }
+  nav a:hover { background: var(--surface); color: var(--text); }
+  main { flex: 1; min-width: 0; padding: 28px 0; }
+  header.hero { border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 8px; }
+  .badge {
+    display: inline-block; background: var(--accent-soft); color: var(--accent);
+    border: 1px solid var(--accent); border-radius: 999px;
+    padding: 3px 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+  }
+  h1 { font-size: 30px; margin: 14px 0 6px; letter-spacing: -0.02em; }
+  h2 { font-size: 21px; margin: 44px 0 10px; letter-spacing: -0.01em; scroll-margin-top: 16px; }
+  h3 { font-size: 16px; margin: 26px 0 8px; }
+  p, li { color: var(--text); }
+  .lead { color: var(--muted); font-size: 16px; max-width: 70ch; }
+  .muted { color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; display: block; overflow-x: auto; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+  td:first-child { white-space: nowrap; }
+  tbody tr:hover { background: var(--surface); }
+  .req { color: var(--accent); font-weight: 700; }
+  .note {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--accent); border-radius: var(--radius);
+    padding: 12px 16px; margin: 16px 0; font-size: 14px;
+  }
+  .note strong { color: var(--text); }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 16px 0; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .card h3 { margin: 0 0 6px; font-size: 14px; }
+  .card p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  footer { border-top: 1px solid var(--line); margin-top: 56px; padding-top: 18px; color: var(--muted); font-size: 13px; }
+  @media (max-width: 900px) {
+    .layout { display: block; padding: 0 16px 60px; }
+    nav { position: static; width: auto; padding: 18px 0 0; max-height: none; }
+    nav .navlinks { display: flex; flex-wrap: wrap; gap: 4px; }
+    nav p { margin: 12px 0 4px; }
+    h1 { font-size: 25px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <p>Empezar</p>
+  <div class="navlinks">
+    <a href="#uso">Uso rápido</a>
+    <a href="#props">Props</a>
+    <a href="#features">features</a>
+    <a href="#accent">accent</a>
+  </div>
+  <p>Comportamiento</p>
+  <div class="navlinks">
+    <a href="#gestos">Gestos y controles</a>
+    <a href="#constantes">Constantes</a>
+    <a href="#directo">Directo y DVR</a>
+    <a href="#subtitulos">Subtítulos</a>
+    <a href="#calidad">Calidad y datos</a>
+    <a href="#preview">Vista previa</a>
+    <a href="#pip">Picture in Picture</a>
+    <a href="#cast">Cast y AirPlay</a>
+    <a href="#errores">Errores</a>
+    <a href="#miniplayer">Miniplayer</a>
+  </div>
+  <p>Referencia</p>
+  <div class="navlinks">
+    <a href="#tipos">Tipos</a>
+    <a href="#dependencias">Dependencias</a>
+    <a href="#recetas">Recetas</a>
+  </div>
+</nav>
+
+<main>
+<header class="hero">
+  <span class="badge">VideoPlayer</span>
+  <h1>Documentación del reproductor</h1>
+  <p class="lead">
+    <code>components/VideoPlayer.tsx</code> es un overlay propio sobre
+    <code>&lt;Video&gt;</code> de <code>react-native-video</code> (el fork de
+    <code>../video_player</code>), con <code>controls={false}</code>: los controles, los
+    gestos y los menús son React Native, así que se ven y se comportan igual en Android
+    y en iOS. Esta página recoge todos sus parámetros.
+  </p>
+</header>
+
+<h2 id="uso">Uso rápido</h2>
+<p>Lo mínimo es una fuente:</p>
+<pre><code>import VideoPlayer from './components/VideoPlayer';
+
+&lt;VideoPlayer source={{uri: 'https://ejemplo.com/video.m3u8'}} /&gt;</code></pre>
+
+<p>Y un ejemplo con casi todo puesto:</p>
+<pre><code>&lt;VideoPlayer
+  source={current.source}
+  title={current.title}
+  style={styles.video}
+  accent="#3ea6ff"
+  features={{seekPreview: false}}
+  storyboard={current.storyboard}
+  paused={paused}
+  onPausedChange={setPaused}
+  dataSaver={dataSaver}
+  onDataSaverChange={setDataSaver}
+  hasPrevious={hasPrevious}
+  hasNext={hasNext}
+  onPrevious={goPrevious}
+  onNext={goNext}
+  onMinimize={minimize}
+  onFullscreenChange={setFullscreen}
+  onPipChange={setPip}
+  onError={setError}
+/&gt;</code></pre>
+
+<div class="note">
+  <strong>Un solo reproductor.</strong> En React Native no se puede reparentar una vista
+  nativa: si se desmonta <code>&lt;VideoPlayer&gt;</code>, ExoPlayer/AVPlayer se liberan y la
+  reproducción se reinicia. Por eso en esta app vive en la raíz
+  (<code>components/PlayerHost.tsx</code>) y las pantallas solo publican dónde dibujarlo.
+</div>
+
+<h2 id="props">Props</h2>
+<table>
+  <thead><tr><th>Prop</th><th>Tipo</th><th>Por defecto</th><th>Qué hace</th></tr></thead>
+  <tbody>
+    <tr><td><code>source</code> <span class="req">*</span></td><td><code>ReactVideoSource</code></td><td>—</td><td>Fuente, tal cual la toma <code>react-native-video</code>: <code>{uri}</code>, <code>require()</code>, con cabeceras o DRM. Cambiarla <em>no</em> recrea el reproductor nativo.</td></tr>
+    <tr><td><code>title</code></td><td><code>string</code></td><td>—</td><td>Título de la barra superior. También es lo que se ve al transmitir o con AirPlay.</td></tr>
+    <tr><td><code>style</code></td><td><code>StyleProp&lt;ViewStyle&gt;</code></td><td>—</td><td>Estilo del contenedor. El vídeo siempre ocupa la caja (<code>resizeMode="contain"</code>).</td></tr>
+    <tr><td><code>accent</code></td><td><code>string</code></td><td><code>'#ff0000'</code></td><td>Color de la barra de progreso y de todo lo que indica «activo». Ver <a href="#accent">accent</a>.</td></tr>
+    <tr><td><code>features</code></td><td><code>PlayerFeatures</code></td><td><code>{}</code> (todo activo)</td><td>Qué controles se ofrecen. Ver <a href="#features">features</a>.</td></tr>
+    <tr><td><code>storyboard</code></td><td><code>StoryboardSource</code></td><td>—</td><td>Miniaturas para la vista previa de la barra. Ver <a href="#preview">vista previa</a>.</td></tr>
+    <tr><td><code>compact</code></td><td><code>boolean</code></td><td><code>false</code></td><td>Modo miniplayer: solo el vídeo, sin overlay ni gestos; los controles los dibuja quien lo envuelve.</td></tr>
+    <tr><td><code>paused</code></td><td><code>boolean</code></td><td>—</td><td>Pausa controlada desde fuera. Si se pasa, manda el padre (necesario para compartir estado con un miniplayer); si no, el reproductor la gestiona solo.</td></tr>
+    <tr><td><code>onPausedChange</code></td><td><code>(paused: boolean) =&gt; void</code></td><td>—</td><td>Avisa de cada cambio de pausa, venga del botón, del gesto o del final del vídeo.</td></tr>
+    <tr><td><code>dataSaver</code></td><td><code>'auto' | 'on' | 'off'</code></td><td><code>'auto'</code></td><td>Ahorro de datos. Vive fuera para que la elección sobreviva al cambio de vídeo. Ver <a href="#calidad">calidad</a>.</td></tr>
+    <tr><td><code>onDataSaverChange</code></td><td><code>(mode: DataSaver) =&gt; void</code></td><td>—</td><td>El usuario lo cambió en ⚙.</td></tr>
+    <tr><td><code>onMinimize</code></td><td><code>() =&gt; void</code></td><td>—</td><td>Si se pasa, aparece el chevron ⌄ junto al título (como en YouTube) para mandar el vídeo al miniplayer.</td></tr>
+    <tr><td><code>onNext</code> / <code>onPrevious</code></td><td><code>() =&gt; void</code></td><td>—</td><td>Lista de reproducción: dibujan ⏭ / ⏮. Sin ellos, los botones no salen.</td></tr>
+    <tr><td><code>hasNext</code> / <code>hasPrevious</code></td><td><code>boolean</code></td><td><code>false</code></td><td>Si hay siguiente/anterior. Cuando no, el botón sale atenuado en vez de desaparecer.</td></tr>
+    <tr><td><code>autoplayNext</code></td><td><code>boolean</code></td><td><code>true</code></td><td>Al terminar, llama a <code>onNext</code>. Con <code>false</code> (o sin siguiente) se queda el icono de repetir.</td></tr>
+    <tr><td><code>onFullscreenChange</code></td><td><code>(fullscreen: boolean) =&gt; void</code></td><td>—</td><td>Entró o salió de pantalla completa (útil para esconder el resto de la UI).</td></tr>
+    <tr><td><code>onPipChange</code></td><td><code>(active: boolean) =&gt; void</code></td><td>—</td><td>Entró o salió de Picture in Picture.</td></tr>
+    <tr><td><code>onError</code></td><td><code>(message: string) =&gt; void</code></td><td>—</td><td>Error fatal de reproducción, ya formateado. El overlay de reintento lo pinta el propio reproductor.</td></tr>
+  </tbody>
+</table>
+<p class="muted"><span class="req">*</span> obligatoria.</p>
+
+<h2 id="features">features — qué controles se ofrecen</h2>
+<p>
+  Todo va activo por defecto: solo se nombra lo que se quiere quitar. Son
+  <code>boolean</code> opcionales, así que <code>features={{skipButtons: false}}</code>
+  deja el resto intacto.
+</p>
+<pre><code>&lt;VideoPlayer
+  source={source}
+  features={{skipButtons: false, trackButtons: false, holdToSpeed: false}}
+/&gt;</code></pre>
+<table>
+  <thead><tr><th>Campo</th><th>Qué quita</th></tr></thead>
+  <tbody>
+    <tr><td><code>skipButtons</code></td><td>Los botones ⟲10 / ⟳10 de la fila central.</td></tr>
+    <tr><td><code>doubleTapSkip</code></td><td>El doble tap en los lados para ±10 s. El tap sencillo pasa a actuar al instante, sin esperar al segundo.</td></tr>
+    <tr><td><code>trackButtons</code></td><td>Los botones ⏮ / ⏭ (que además necesitan <code>onNext</code>/<code>onPrevious</code>).</td></tr>
+    <tr><td><code>seekBar</code></td><td>La barra arrastrable <em>y</em> la barra fina que queda cuando se ocultan los controles.</td></tr>
+    <tr><td><code>seekPreview</code></td><td>La miniatura al arrastrar (que además necesita <code>storyboard</code>).</td></tr>
+    <tr><td><code>holdToSpeed</code></td><td>El x2 al mantener pulsado el vídeo.</td></tr>
+    <tr><td><code>subtitlesButton</code></td><td>El botón CC. Las pistas se siguen eligiendo en ⚙.</td></tr>
+    <tr><td><code>settingsButton</code></td><td>El botón ⚙ y su menú entero: calidad, ahorro de datos, subtítulos y velocidad.</td></tr>
+    <tr><td><code>pipButton</code></td><td>El botón ▭ (que además necesita que el dispositivo soporte PiP).</td></tr>
+    <tr><td><code>routeButtons</code></td><td>Los botones de Chromecast y AirPlay.</td></tr>
+    <tr><td><code>fullscreenButton</code></td><td>El botón ⤢ de pantalla completa.</td></tr>
+  </tbody>
+</table>
+<div class="note">
+  <strong>Quitar un control quita el control, no la función.</strong> Sin
+  <code>skipButtons</code> el doble tap sigue saltando ±10 s, y sin
+  <code>subtitlesButton</code> las pistas siguen estando en ⚙. Para eliminar la función
+  hay que apagar las dos cosas: <code>{{skipButtons: false, doubleTapSkip: false}}</code>.
+</div>
+
+<h2 id="accent">accent — un color para todo lo que significa lo mismo</h2>
+<p>
+  <code>accent</code> (por defecto <code>#ff0000</code>) pinta a la vez la barra de
+  progreso y todos los estados «activo», para que no haya dos colores distintos diciendo
+  lo mismo:
+</p>
+<ul>
+  <li>La parte reproducida de la barra y su tirador.</li>
+  <li>La barra fina de cuando los controles están ocultos.</li>
+  <li>El botón CC encendido.</li>
+  <li>La opción marcada en ⚙ (texto y ✓).</li>
+  <li>El badge <strong>EN VIVO</strong> cuando vas pegado al directo.</li>
+  <li>El icono de AirPlay cuando la ruta está activa.</li>
+</ul>
+<pre><code>// Todo azul, al estilo de la UI del sistema
+&lt;VideoPlayer source={source} accent="#3ea6ff" /&gt;</code></pre>
+<p class="muted">
+  Lo que <em>no</em> cambia: el buffer (gris), el fondo de los menús y los iconos en
+  reposo (blancos). Son estados neutros, no acciones.
+</p>
+
+<h2 id="gestos">Gestos y controles</h2>
+<table>
+  <thead><tr><th>Gesto / control</th><th>Comportamiento</th></tr></thead>
+  <tbody>
+    <tr><td>Tap en el vídeo</td><td>Muestra u oculta los controles; se ocultan solos a los 3 s mientras reproduce.</td></tr>
+    <tr><td>Doble tap en un lado</td><td>−10 s / +10 s. Taps seguidos acumulan (20 s, 30 s…) mientras no pase la ventana de encadenado.</td></tr>
+    <tr><td>Mantener pulsado</td><td>x2 mientras no sueltes, como en TikTok. Oculta los controles y sale el aviso <strong>⏩ 2x</strong>. Ver abajo.</td></tr>
+    <tr><td>Arrastrar la barra</td><td>Buscar, con miniatura y tiempo si hay <code>storyboard</code>; el resto de controles se aparta.</td></tr>
+    <tr><td>Fila central</td><td>⏮ · ⟲10 · Play/Pause/Repetir · ⟳10 · ⏭. En VOD, ⏮ reinicia el vídeo si llevas más de 3 s.</td></tr>
+    <tr><td>⌄ (junto al título)</td><td>Miniplayer, solo si se pasa <code>onMinimize</code> y no estás en pantalla completa.</td></tr>
+    <tr><td>⤢</td><td>Pantalla completa: rota a horizontal y bloquea la orientación; el botón atrás sale.</td></tr>
+    <tr><td>CC · ⚙ · ▭</td><td>Subtítulos rápidos, menú de ajustes y Picture in Picture.</td></tr>
+  </tbody>
+</table>
+
+<h3>Mantener pulsado para x2</h3>
+<p>
+  El umbral son 400 ms, por encima de la ventana de doble tap, para que un tap que se
+  demora no acelere sin querer; <code>Pressable</code> no llama a <code>onPress</code> si
+  ya disparó el pulsado largo, así que el gesto no se pisa con el tap ni con los ±10 s.
+</p>
+<ul>
+  <li>Si en ⚙ ya había una velocidad mayor, esa gana: acelerar nunca frena.</li>
+  <li>No se activa en directo (correríamos hasta el borde del directo para acabar atascados), transmitiendo, en pausa, al terminar ni en error.</li>
+  <li>Si algo de eso pasa con el dedo todavía abajo, vuelve sola a la velocidad normal.</li>
+</ul>
+
+<h2 id="constantes">Constantes (se tocan en el código)</h2>
+<p>
+  No son props: son las constantes de <code>components/VideoPlayer.tsx</code>, por si hay
+  que afinar el tacto.
+</p>
+<table>
+  <thead><tr><th>Constante</th><th>Valor</th><th>Qué controla</th></tr></thead>
+  <tbody>
+    <tr><td><code>SKIP_SECONDS</code></td><td>10</td><td>Salto del doble tap y de los botones ⟲/⟳.</td></tr>
+    <tr><td><code>DOUBLE_TAP_MS</code></td><td>300</td><td>Ventana para considerar dos taps como uno doble.</td></tr>
+    <tr><td><code>SKIP_CHAIN_MS</code></td><td>800</td><td>Tras un doble tap, taps sencillos siguen saltando (y dura el aviso).</td></tr>
+    <tr><td><code>BOOST_RATE</code> / <code>BOOST_HOLD_MS</code></td><td>2 · 400</td><td>Velocidad del pulsado largo y cuánto hay que aguantar.</td></tr>
+    <tr><td><code>AUTO_HIDE_MS</code></td><td>3000</td><td>Cuánto tardan en irse los controles.</td></tr>
+    <tr><td><code>SPEEDS</code></td><td>0.5 … 2</td><td>Opciones del menú de velocidad.</td></tr>
+    <tr><td><code>LIVE_EDGE_TOLERANCE_S</code></td><td>5</td><td>Retraso por debajo del cual se considera que vas «en directo».</td></tr>
+    <tr><td><code>MIN_DVR_WINDOW_S</code></td><td>30</td><td>Ventana DVR mínima para dibujar barra y permitir saltos.</td></tr>
+    <tr><td><code>RETRY_DELAYS_MS</code></td><td>2 s … 30 s</td><td>Backoff de los reintentos automáticos tras un error.</td></tr>
+    <tr><td><code>PREVIEW_WIDTH</code></td><td>160</td><td>Ancho en pantalla de la miniatura de la vista previa.</td></tr>
+    <tr><td><code>DEFAULT_ACCENT</code></td><td><code>#ff0000</code></td><td>Valor por defecto de <code>accent</code>.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="directo">Directo y DVR</h2>
+<p>
+  No hay que declarar nada: el reproductor detecta el directo con el campo
+  <code>isLive</code> que publica la librería en <code>onLoad</code>/<code>onProgress</code>.
+</p>
+<div class="cols">
+  <div class="card">
+    <h3>Directo sin DVR</h3>
+    <p>Badge EN VIVO fijo, sin barra ni saltos: no hay nada hacia atrás a donde ir.</p>
+  </div>
+  <div class="card">
+    <h3>Directo con DVR</h3>
+    <p>La barra representa la ventana DVR (<code>seekableDuration</code>). Al retrasarte, el badge se apaga y sale el retraso (−1:20); tocarlo vuelve al directo.</p>
+  </div>
+  <div class="card">
+    <h3>Vuelta al directo</h3>
+    <p>Soltar la barra a menos de 5 s del borde equivale a pulsar EN VIVO.</p>
+  </div>
+</div>
+
+<h2 id="subtitulos">Subtítulos</h2>
+<p>
+  Las pistas salen del propio stream (<code>onTextTracks</code> y
+  <code>onLoad.textTracks</code>): no hay que pasarlas. El botón CC enciende y apaga la
+  última usada, y la lista completa está en ⚙ › Subtítulos.
+</p>
+<ul>
+  <li>Si el stream no trae pistas, el botón CC no aparece.</li>
+  <li>Android dibuja los subtítulos dentro de la superficie, así que se suben cuando los controles tapan la parte de abajo; en iOS los coloca el sistema.</li>
+  <li>Una pista sin título (pasa en iOS) se etiqueta con su idioma, y si tampoco lo trae, «Pista N».</li>
+</ul>
+
+<h2 id="calidad">Calidad y ahorro de datos</h2>
+<p><strong>Calidad</strong> (⚙ › Calidad): «Auto» (ABR) o una altura concreta —1080p, 720p…— vía <code>selectedVideoTrack</code>. En iOS 15+ la elección funciona como tope de resolución, no como fijación exacta.</p>
+<p><strong>Ahorro de datos</strong> (prop <code>dataSaver</code> y ⚙ › Ahorro de datos): limita el bitrate con <code>maxBitRate</code> según la red detectada por NetInfo. Solo manda con calidad automática: si el usuario fija una resolución a mano, su elección gana.</p>
+<table>
+  <thead><tr><th>Modo</th><th>Wi-Fi / cable</th><th>Móvil</th></tr></thead>
+  <tbody>
+    <tr><td><code>'auto'</code></td><td>Sin tope</td><td>5G/4G: 2,5 Mb/s · 3G: 0,8 Mb/s · 2G: 0,4 Mb/s</td></tr>
+    <tr><td><code>'on'</code></td><td>0,8 Mb/s</td><td>0,8 Mb/s</td></tr>
+    <tr><td><code>'off'</code></td><td>Sin tope</td><td>Sin tope</td></tr>
+  </tbody>
+</table>
+<p class="muted">
+  No sustituye al ABR (que ya baja la calidad cuando el ancho de banda real no da): limita
+  cuánto se gasta cuando sí daría. El ancho de banda estimado que se enseña en el menú
+  viene de <code>onBandwidthUpdate</code>, que solo existe en Android.
+</p>
+
+<h2 id="preview">Vista previa de la barra (storyboard)</h2>
+<p>
+  Como YouTube: en vez de sacar fotogramas al vuelo (lento y caro), se usa un
+  <em>storyboard</em> —una imagen-mosaico con una miniatura cada N segundos— y solo se
+  recorta. Dos formatos:
+</p>
+<pre><code>// 1. Sprite empaquetado con la app + su índice JSON
+storyboard={{
+  image: require('./assets/storyboards/big-buck-bunny.jpg'),
+  index: require('./assets/storyboards/big-buck-bunny.json'),
+}}
+
+// 2. WebVTT de miniaturas, que es lo que sirven los empaquetadores
+storyboard={{vttUri: 'https://cdn.ejemplo.com/vod/thumbs.vtt'}}</code></pre>
+<p>El índice JSON de la primera forma:</p>
+<pre><code>{"interval": 5, "columns": 12, "rows": 11, "width": 120, "height": 68, "count": 127}</code></pre>
+<p>Y el VTT de la segunda usa los fragmentos espaciales de siempre:</p>
+<pre><code>00:00:05.000 --&gt; 00:00:10.000
+sprite.jpg#xywh=160,0,160,92</code></pre>
+<h3>Generar el sprite</h3>
+<pre><code># macOS (AVFoundation): vale igual con HLS remoto y con MP4
+swift scripts/storyboard.swift \
+  https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8 \
+  assets/storyboards/big-buck-bunny 5 120
+
+# Linux/CI: el equivalente con ffmpeg (el índice se escribe a mano)
+ffmpeg -i entrada.m3u8 -vf "fps=1/5,scale=160:-1,tile=12x11" -frames:v 1 salida.jpg</code></pre>
+<div class="note">
+  La vista previa solo sale en VOD con storyboard: en directo habría que generar los
+  sprites en continuo desde el servidor, y al transmitir manda el receptor. Miniaturas de
+  120 px cuestan ~7,8 MB de native heap mientras se ven; con 160 px eran 11,5 MB.
+</div>
+
+<h2 id="pip">Picture in Picture</h2>
+<p>
+  El botón ▭ solo aparece donde el dispositivo dice que puede: el fork expone
+  <code>isPictureInPictureSupported()</code> y el reproductor lo consulta al montarse.
+  Entrar en PiP donde no se soporta no falla, simplemente no hace nada, así que sin esta
+  consulta el botón parecería roto.
+</p>
+<pre><code>import {isPictureInPictureSupported} from 'react-native-video';
+
+const [pipSupported, setPipSupported] = useState(false);
+useEffect(() =&gt; { isPictureInPictureSupported().then(setPipSupported); }, []);</code></pre>
+<ul>
+  <li><strong>iOS:</strong> <code>AVPictureInPictureController.isPictureInPictureSupported()</code>. Es <code>false</code> en el simulador, así que PiP solo se prueba en dispositivo.</li>
+  <li><strong>Android:</strong> API 26+ y que el sistema declare <code>android.software.picture_in_picture</code>; hace falta <code>android:supportsPictureInPicture="true"</code> en la Activity.</li>
+  <li>Cuando hay soporte, también se entra solo al salir de la app (<code>enterPictureInPictureOnLeave</code>).</li>
+</ul>
+
+<h2 id="cast">Chromecast y AirPlay</h2>
+<ul>
+  <li><strong>Chromecast:</strong> el botón nativo del SDK se esconde solo si no hay dispositivos. Al conectar, el vídeo se carga en el receptor desde la posición local; los controles pasan a gobernar el receptor y abajo se lee el dispositivo.</li>
+  <li><strong>AirPlay (iOS):</strong> el vídeo sale por la tele, pero lo sigue reproduciendo el mismo <code>AVPlayer</code>, así que los controles valen igual; solo cambia lo que se ve en el móvil.</li>
+  <li>Los dos botones se quitan juntos con <code>features={{routeButtons: false}}</code>.</li>
+</ul>
+
+<h2 id="errores">Errores y recuperación</h2>
+<ul>
+  <li>Overlay con el mensaje y un botón <em>Reintentar</em>, más reintentos automáticos con backoff: 2 s, 4 s, 8 s, 16 s y 30 s.</li>
+  <li>Se reanuda donde estaba (o en el borde del directo) remontando <code>&lt;Video&gt;</code>, porque la librería no reinicializa el reproductor tras un error fatal.</li>
+  <li>Sin red, el mensaje cambia a «Sin conexión» y el reintento espera a que vuelva (NetInfo).</li>
+  <li>Con error, el overlay <strong>conserva la salida</strong>: ⌄ y ⤢ siguen visibles, para no quedarse atrapado en pantalla completa.</li>
+  <li><code>onError</code> recibe el mensaje ya formateado, por si quieres registrarlo fuera.</li>
+</ul>
+
+<h2 id="miniplayer">Miniplayer y control externo</h2>
+<p>
+  <code>compact</code> deja solo el vídeo: ni overlay, ni gestos, ni menús. Quien lo use
+  dibuja encima sus propios controles (en esta app, la barra con play/cerrar de
+  <code>PlayerHost</code>). Para que el miniplayer y el reproductor grande compartan
+  estado, la pausa se controla desde fuera:
+</p>
+<pre><code>&lt;VideoPlayer
+  source={source}
+  compact
+  paused={paused}
+  onPausedChange={setPaused}
+/&gt;</code></pre>
+
+<h2 id="tipos">Tipos exportados</h2>
+<pre><code>// components/VideoPlayer.tsx
+export type PlayerFeatures = {
+  skipButtons?: boolean;
+  doubleTapSkip?: boolean;
+  trackButtons?: boolean;
+  seekBar?: boolean;
+  seekPreview?: boolean;
+  holdToSpeed?: boolean;
+  subtitlesButton?: boolean;
+  settingsButton?: boolean;
+  pipButton?: boolean;
+  routeButtons?: boolean;
+  fullscreenButton?: boolean;
+};
+export function formatTime(seconds: number): string;
+
+// components/useNetworkCap.ts
+export type DataSaver = 'auto' | 'on' | 'off';
+export const mbps: (bits: number) =&gt; string;
+
+// components/useStoryboard.ts
+export type StoryboardSource =
+  | {image: ImageSourcePropType; index: StoryboardIndex}
+  | {vttUri: string};</code></pre>
+
+<h2 id="dependencias">Dependencias</h2>
+<table>
+  <thead><tr><th>Paquete</th><th>Para qué</th></tr></thead>
+  <tbody>
+    <tr><td><code>react-native-video</code> (fork)</td><td>El <code>&lt;Video&gt;</code> nativo, <code>isLive</code>, AirPlay y la consulta de PiP.</td></tr>
+    <tr><td><code>react-native-svg</code></td><td>Los iconos (<code>components/icons.tsx</code>, geometría de Material Symbols).</td></tr>
+    <tr><td><code>@react-native-community/netinfo</code></td><td>Ahorro de datos y detección de «sin conexión».</td></tr>
+    <tr><td><code>react-native-orientation-locker</code></td><td>Rotar y bloquear en pantalla completa.</td></tr>
+    <tr><td><code>react-native-google-cast</code></td><td>Chromecast.</td></tr>
+    <tr><td><code>react-native-safe-area-context</code></td><td>Respetar notch y barras del sistema con los controles.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="recetas">Recetas</h2>
+<h3>Reproductor mínimo, sin adornos</h3>
+<pre><code>&lt;VideoPlayer
+  source={source}
+  features={{
+    skipButtons: false,
+    doubleTapSkip: false,
+    trackButtons: false,
+    seekPreview: false,
+    holdToSpeed: false,
+    settingsButton: false,
+    pipButton: false,
+    routeButtons: false,
+  }}
+/&gt;</code></pre>
+
+<h3>Canal en directo, sin ajustes ni PiP</h3>
+<pre><code>&lt;VideoPlayer
+  source={{uri: canal.uri}}
+  title={canal.title}
+  features={{settingsButton: false, pipButton: false}}
+  accent="#e11d48"
+/&gt;</code></pre>
+<p class="muted">En directo, los saltos y el x2 ya se desactivan solos; no hace falta pedirlo.</p>
+
+<h3>Solo mirar, sin tocar (kiosco)</h3>
+<pre><code>&lt;VideoPlayer
+  source={source}
+  features={{
+    seekBar: false,
+    doubleTapSkip: false,
+    skipButtons: false,
+    holdToSpeed: false,
+    fullscreenButton: false,
+  }}
+/&gt;</code></pre>
+
+<footer>
+  Generado para <code>video_app</code>. El código manda: si algo aquí no cuadra, la
+  referencia son <code>components/VideoPlayer.tsx</code> y el <code>README.md</code> del
+  repositorio.
+</footer>
+</main>
+</div>
+</body>
+</html>
