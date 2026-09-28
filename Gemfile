@@ -8,6 +8,12 @@ gem 'cocoapods', '>= 1.13', '!= 1.15.0', '!= 1.15.1'
 gem 'activesupport', '>= 6.1.7.5', '!= 7.1.0'
 gem 'xcodeproj', '< 1.26.0'
 gem 'concurrent-ruby', '< 1.3.4'
+
+# Ruby 3.4+ sacó estas de la biblioteca estándar y CocoaPods las sigue necesitando.
+gem 'bigdecimal'
+gem 'logger'
+gem 'benchmark'
+gem 'mutex_m'
 # json 3.x removed the `quirks_mode` option that activesupport 7.2 still passes
 # ("unknown keyword: quirks_mode" during pod install on Ruby 4 / Homebrew).
 gem 'json', '< 3.0'

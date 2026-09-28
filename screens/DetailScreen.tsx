@@ -19,7 +19,7 @@ import {usePlayer} from '../player/PlayerContext';
  */
 export default function DetailScreen() {
   const player = usePlayer();
-  const boxRef = useRef<View>(null);
+  const boxRef = useRef<React.ComponentRef<typeof View>>(null);
   const insets = useSafeAreaInsets();
   const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const index = player.index ?? 0;

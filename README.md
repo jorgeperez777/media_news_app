@@ -1,6 +1,6 @@
 # VideoApp
 
-App React Native (0.78, bare) mínima para probar y desarrollar la librería
+App React Native (0.87, bare) mínima para probar y desarrollar la librería
 `react-native-video` que vive en `../video_player`.
 
 La librería se enlaza como symlink (`"react-native-video": "link:../video_player"`)
@@ -13,8 +13,12 @@ se refleja con un reload; los cambios nativos (Kotlin/Swift) requieren recompila
   viene vendorizado en `.yarn/releases`).
 - **iOS:** Xcode + CocoaPods. La primera vez acepta la licencia: `sudo xcodebuild -license accept`.
   El `Gemfile` fija `json < 3` y añade `nkf` (Ruby 4 de Homebrew rompe CocoaPods sin eso) y el
-  `Podfile` compila la pod `fmt` como C++17 (necesario con Xcode 26+ y RN 0.78).
+  `Podfile` compila la pod `fmt` como C++17 (necesario con Xcode 26+).
 - **Android:** SDK en `/opt/homebrew/share/android-commandlinetools` (ya configurado en `android/local.properties`), JDK 17.
+- **Parche versionado:** `react-native-orientation-locker` (sin publicar desde 2024) llama a
+  `removeListeners:1` en su `dealloc`, y RN 0.87 aborta con redbox si se dan de baja más
+  oyentes de los que se dieron de alta — saltaba en cada reload de Metro. El parche está en
+  `.yarn/patches/` y lo aplica `yarn install`; no hay que hacer nada a mano.
 
 ## Instalación
 

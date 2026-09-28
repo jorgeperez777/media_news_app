@@ -22,7 +22,7 @@ import {LiveTvIcon, PlayIcon} from '../components/icons';
  */
 export default function LiveScreen() {
   const player = usePlayer();
-  const boxRef = useRef<View>(null);
+  const boxRef = useRef<React.ComponentRef<typeof View>>(null);
   const insets = useSafeAreaInsets();
   const {width: windowWidth, height: windowHeight} = useWindowDimensions();
 
@@ -131,7 +131,7 @@ export default function LiveScreen() {
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#0f0f0f'},
   playerBox: {width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000'},
-  empty: {...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 8},
+  empty: {...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', gap: 8},
   emptyText: {color: 'rgba(255,255,255,0.6)', fontSize: 13},
   list: {padding: 16, gap: 14},
   heading: {color: '#fff', fontSize: 20, fontWeight: '700'},

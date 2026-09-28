@@ -70,7 +70,7 @@ export default function PlayerHost() {
   // completa: la caja tiene que dejar de acotarlo.
   const containerStyle =
     fullscreen || pip
-      ? StyleSheet.absoluteFillObject
+      ? StyleSheet.absoluteFill
       : {left: box.x, top: box.y, width: box.width, height: box.height};
 
   const videoStyle =
