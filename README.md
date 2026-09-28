@@ -149,9 +149,15 @@ Dos cosas que conviene no confundir al medir:
 
 ## Controles estilo YouTube
 
-> Referencia completa del componente (props, `features`, `accent`, gestos, storyboard,
-> PiP, cast, errores y recetas) en **[`docs/index.html`](docs/index.html)** —
-> `open docs/index.html`.
+> Referencia completa del componente (props, `features`, `accent`, gestos, capítulos,
+> seguir viendo, telemetría, accesibilidad, idiomas, storyboard, PiP, cast, errores y
+> recetas) en **[`docs/index.html`](docs/index.html)** — `open docs/index.html`.
+
+La app guarda la posición de cada vídeo y las preferencias (idioma de subtítulos y de
+audio, calidad, velocidad y ahorro de datos) en AsyncStorage (`player/storage.ts`), y
+recoge métricas de QoE por sesión (`player/telemetry.ts`) que se ven en la pestaña
+**Perfil**. Los textos salen de `i18n/` (español e inglés, según el idioma del
+dispositivo).
 
 `components/VideoPlayer.tsx` envuelve `<Video controls={false}>` con un overlay
 propio. Los iconos son SVG (`components/icons.tsx`, con `react-native-svg`) sobre la
@@ -163,11 +169,15 @@ geometría de Material Symbols: un viewBox 24×24 común, color y tamaño por pr
 | Tap en el vídeo | Muestra/oculta los controles (se ocultan solos a los 3 s) |
 | Doble tap izquierda/derecha | −10 s / +10 s; taps seguidos acumulan (20 s, 30 s…) |
 | Mantener pulsado el vídeo | x2 mientras no sueltes (ver [Acelerar manteniendo pulsado](#acelerar-manteniendo-pulsado-x2)) |
+| Deslizar arriba/abajo | Volumen (mitad derecha) y brillo (mitad izquierda), con aviso en pantalla |
+| Pellizcar | Ajustar (contain) o rellenar (cover) |
+| «Saltar intro» | En los tramos marcados como saltables de `chapters` |
+| Tarjeta «a continuación» | Últimos 10 s de un VOD con siguiente: cuenta atrás, reproducir ya o cancelar |
 | Botones centrales | ⏮ · ⟲10 · Play/Pause/Replay · ⟳10 · ⏭ (⏮/⏭ cuando hay lista, también en directo; en VOD ⏮ reinicia si llevas > 3 s, como YouTube) |
 | Fin del vídeo | Autoplay del siguiente de la lista (`autoplayNext`, por defecto `true`); sin siguiente, icono de Replay |
 | Barra roja inferior | Arrastrable (scrubbing) con buffer en gris; mini barra cuando los controles están ocultos |
 | Arrastrar la barra | Vista previa con miniatura y tiempo (ver [Vista previa](#vista-previa-en-la-barra-storyboard)); el resto de controles se aparta |
-| ⚙ (arriba derecha) | Menú: **Calidad** (Auto + alturas disponibles, p. ej. 1080p/720p/480p, vía `onVideoTracks` + `selectedVideoTrack`; en iOS 15+ es un tope de resolución), **Ahorro de datos**, **Subtítulos** y **Velocidad** 0.5x – 2x |
+| ⚙ (arriba derecha) | Menú: **Audio** (pistas del stream), **Calidad** (Auto + alturas disponibles, p. ej. 1080p/720p/480p, vía `onVideoTracks` + `selectedVideoTrack`; en iOS 15+ es un tope de resolución), **Ahorro de datos**, **Subtítulos** y **Velocidad** 0.5x – 2x |
 | CC (arriba derecha) | Enciende/apaga los subtítulos; solo aparece si el vídeo trae pistas. Azul = activos |
 | ⛶ (abajo derecha) | Pantalla completa: rota a horizontal, botón atrás sale |
 | Spinner | Mientras hace buffering |

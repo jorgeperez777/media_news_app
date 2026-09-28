@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Controles en la notificación y en la pantalla de bloqueo (showNotificationControls):
+         react-native-video los publica desde un MediaSessionService propio. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <application
       android:name=".MainApplication"
@@ -37,6 +41,15 @@
           android:name="android.support.PARENT_ACTIVITY"
           android:value=".MainActivity" />
       </activity>
+
+      <service
+        android:name="com.brentvatne.exoplayer.VideoPlaybackService"
+        android:exported="false"
+        android:foregroundServiceType="mediaPlayback">
+        <intent-filter>
+          <action android:name="androidx.media3.session.MediaSessionService" />
+        </intent-filter>
+      </service>
 
       <!-- Chromecast: el OptionsProvider que trae react-native-google-cast ya configura
            la notificación y el controlador expandido. CC1AD845 es el Default Media

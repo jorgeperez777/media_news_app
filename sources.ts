@@ -1,4 +1,5 @@
 // Fuentes de prueba públicas (verificadas con HTTP 200).
+import type {Chapter} from './components/VideoPlayer';
 import type {StoryboardSource} from './components/useStoryboard';
 
 export type Source = {
@@ -7,9 +8,15 @@ export type Source = {
   label: string;
   title: string;
   description: string;
-  source: {uri: string};
+  /** Se pasa tal cual a <Video>; `metadata` alimenta los controles del sistema. */
+  source: {
+    uri: string;
+    metadata?: {title?: string; subtitle?: string; artist?: string};
+  };
   /** Miniaturas para la vista previa de la barra (ver scripts/storyboard.swift). */
   storyboard?: StoryboardSource;
+  /** Tramos con nombre: muescas en la barra y «Saltar intro» en los saltables. */
+  chapters?: Chapter[];
 };
 
 const SOURCES: Source[] = [
@@ -21,6 +28,7 @@ const SOURCES: Source[] = [
       'Canal lineal 24/7 (HLS multi-calidad). Emite siempre en directo, sin ventana DVR.',
     source: {
       uri: 'https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8',
+      metadata: {title: 'Red Bull TV', subtitle: 'CANAL 1', artist: 'VideoApp'},
     },
   },
   {
@@ -31,6 +39,7 @@ const SOURCES: Source[] = [
       'Directo con ventana DVR: badge EN VIVO, barra sobre la ventana y botón para volver al directo.',
     source: {
       uri: 'https://demo.unified-streaming.com/k8s/live/stable/scte35.isml/.m3u8',
+      metadata: {title: 'Unified Streaming — directo con DVR', subtitle: 'CANAL 2', artist: 'VideoApp'},
     },
   },
   {
@@ -40,6 +49,7 @@ const SOURCES: Source[] = [
     description: 'Canal de noticias 24/7, útil para ver el cambio de calidad en directo.',
     source: {
       uri: 'https://tagesschau.akamaized.net/hls/live/2020115/tagesschau/tagesschau_1/master.m3u8',
+      metadata: {title: 'tagesschau (ARD)', subtitle: 'CANAL 3', artist: 'VideoApp'},
     },
   },
   {
@@ -48,11 +58,20 @@ const SOURCES: Source[] = [
     title: 'Big Buck Bunny (HLS)',
     description:
       'VOD multi-calidad: menú de calidades, velocidad, saltos de ±10 s y vista previa al arrastrar.',
-    source: {uri: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'},
+    source: {
+      uri: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+      metadata: {title: 'Big Buck Bunny (HLS)', subtitle: 'HLS', artist: 'VideoApp'},
+    },
     storyboard: {
       image: require('./assets/storyboards/big-buck-bunny.jpg'),
       index: require('./assets/storyboards/big-buck-bunny.json'),
     },
+    chapters: [
+      {title: 'Intro', start: 0, end: 33, skippable: true},
+      {title: 'El prado', start: 33, end: 190},
+      {title: 'La emboscada', start: 190, end: 420},
+      {title: 'La venganza', start: 420, end: 634},
+    ],
   },
   {
     kind: 'vod',
@@ -62,6 +81,22 @@ const SOURCES: Source[] = [
       'Trae varias pistas de subtítulos dentro del propio stream: botón CC y lista en ⚙.',
     source: {
       uri: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
+      metadata: {title: 'Apple BipBop', subtitle: 'SUBS', artist: 'VideoApp'},
+    },
+  },
+  {
+    kind: 'vod',
+    label: 'AUDIO',
+    title: 'Tears of Steel (varios idiomas)',
+    description:
+      'Trae audio en inglés y en italiano: fila «Audio» en ⚙ para cambiar de pista.',
+    source: {
+      uri: 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel-multi-lang.ism/.m3u8',
+      metadata: {
+        title: 'Tears of Steel',
+        subtitle: 'AUDIO',
+        artist: 'VideoApp',
+      },
     },
   },
   {
@@ -70,7 +105,10 @@ const SOURCES: Source[] = [
     label: 'URL rota',
     title: 'URL inexistente (404)',
     description: 'Para probar la recuperación: overlay de error y reintentos con backoff.',
-    source: {uri: 'https://test-streams.mux.dev/no-existe/master.m3u8'},
+    source: {
+      uri: 'https://test-streams.mux.dev/no-existe/master.m3u8',
+      metadata: {title: 'URL inexistente (404)', subtitle: 'URL rota', artist: 'VideoApp'},
+    },
   },
   {
     kind: 'vod',
@@ -79,11 +117,18 @@ const SOURCES: Source[] = [
     description: 'MP4 progresivo: una sola calidad, sin menú, con vista previa.',
     source: {
       uri: 'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4',
+      metadata: {title: 'Big Buck Bunny (MP4 720p)', subtitle: 'MP4', artist: 'VideoApp'},
     },
     storyboard: {
       image: require('./assets/storyboards/big-buck-bunny-mp4.jpg'),
       index: require('./assets/storyboards/big-buck-bunny-mp4.json'),
     },
+    chapters: [
+      {title: 'Intro', start: 0, end: 33, skippable: true},
+      {title: 'El prado', start: 33, end: 190},
+      {title: 'La emboscada', start: 190, end: 420},
+      {title: 'La venganza', start: 420, end: 634},
+    ],
   },
 ];
 

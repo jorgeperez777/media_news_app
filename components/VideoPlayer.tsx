@@ -4,6 +4,7 @@ import {
   BackHandler,
   Image,
   Modal,
+  PanResponder,
   PixelRatio,
   Pressable,
   StatusBar,
@@ -40,6 +41,7 @@ import Video, {
 import {t} from '../i18n';
 import {formatTime} from './format';
 import type {PlaybackEvent} from '../player/telemetry';
+import {SAVE_EVERY_MS, type Prefs} from '../player/storage';
 import SeekBar from './SeekBar';
 import useCast from './useCast';
 import useNetworkCap, {mbps, type DataSaver} from './useNetworkCap';
@@ -83,6 +85,17 @@ const RETRY_DELAYS_MS = [2000, 4000, 8000, 16000, 30000];
 type Side = 'left' | 'right';
 
 /**
+ * Tramo con nombre dentro del vídeo. Separa la barra de progreso y, si es
+ * `skippable`, saca el botón para saltarlo (intro, resumen del capítulo previo…).
+ */
+export type Chapter = {
+  title: string;
+  start: number;
+  end: number;
+  skippable?: boolean;
+};
+
+/**
  * Qué partes del overlay se ofrecen. Todas van activas por defecto: solo hace
  * falta pasar las que quieras quitar (`features={{skipButtons: false}}`).
  */
@@ -109,6 +122,14 @@ export type PlayerFeatures = {
   routeButtons?: boolean;
   /** Botón ⤢ de pantalla completa. */
   fullscreenButton?: boolean;
+  /** Botón «Saltar intro» en los capítulos marcados como saltables. */
+  skipIntro?: boolean;
+  /** Tarjeta de «a continuación» en los últimos segundos. */
+  nextUpCard?: boolean;
+  /** Deslizar arriba/abajo: volumen (derecha) y brillo (izquierda). */
+  verticalGestures?: boolean;
+  /** Pellizcar para alternar entre ajustar y rellenar la pantalla. */
+  pinchToFill?: boolean;
 };
 
 type Props = {
@@ -152,6 +173,29 @@ type Props = {
   onDataSaverChange?: (mode: DataSaver) => void;
   /** Miniaturas para la vista previa de la barra (ver `useStoryboard`). */
   storyboard?: StoryboardSource;
+  /** Capítulos del vídeo: marcas en la barra y botón de saltar intro. */
+  chapters?: Chapter[];
+  /** Qué viene después, para la tarjeta de continuidad de los últimos segundos. */
+  nextUp?: {title: string};
+  /**
+   * Controles del sistema (notificación en Android, pantalla de bloqueo y centro de
+   * control en iOS) con los metadatos de `source.metadata`. En iOS solo se ven en
+   * dispositivo, no en el simulador.
+   */
+  notificationControls?: boolean;
+  /** Seguir sonando con la app en segundo plano (radio/TV). */
+  playInBackground?: boolean;
+  /** Segundo por el que arrancar («seguir viendo»). Solo VOD. */
+  startPosition?: number;
+  /** Cada pocos segundos, para que quien nos use guarde la posición. */
+  onPositionChange?: (seconds: number, duration: number) => void;
+  /**
+   * Preferencias recordadas entre sesiones (idioma de subtítulos y audio, calidad
+   * y velocidad). El reproductor las aplica cuando el stream anuncia sus pistas y
+   * avisa por `onPrefsChange` en cuanto el usuario cambia algo.
+   */
+  prefs?: Prefs;
+  onPrefsChange?: (prefs: Prefs) => void;
   /** Controles que se ofrecen; por defecto, todos (ver `PlayerFeatures`). */
   features?: PlayerFeatures;
   /**
@@ -170,6 +214,8 @@ type Props = {
 const BOTTOM_BAR_PADDING = 12;
 // Acento por defecto: el rojo de la barra de progreso.
 const DEFAULT_ACCENT = '#ff0000';
+// La tarjeta de «a continuación» aparece en los últimos segundos del vídeo.
+const NEXT_UP_S = 10;
 // Ancho en pantalla de la miniatura de la vista previa; el alto lo pone el sprite.
 const PREVIEW_WIDTH = 160;
 
@@ -198,6 +244,14 @@ export default function VideoPlayer({
   dataSaver = 'auto',
   onDataSaverChange,
   storyboard,
+  chapters,
+  nextUp,
+  notificationControls = true,
+  playInBackground = false,
+  startPosition = 0,
+  onPositionChange,
+  prefs,
+  onPrefsChange,
   features = {},
   accent = DEFAULT_ACCENT,
   onEvent,
@@ -214,6 +268,10 @@ export default function VideoPlayer({
     pipButton = true,
     routeButtons = true,
     fullscreenButton = true,
+    skipIntro = true,
+    nextUpCard = true,
+    verticalGestures = true,
+    pinchToFill = true,
   } = features;
   const videoRef = useRef<VideoRef>(null);
   const insets = useSafeAreaInsets();
@@ -282,6 +340,14 @@ export default function VideoPlayer({
   // Vista previa de la barra: recorte del storyboard para el instante arrastrado.
   const tileAt = useStoryboard(seekPreview ? storyboard : undefined);
   const [layoutWidth, setLayoutWidth] = useState(0);
+  // Gestos verticales: volumen del reproductor y «brillo». El brillo real del
+  // sistema necesita módulo nativo, así que lo que se ajusta es un velo negro
+  // encima del vídeo: oscurece, que es para lo que se usa de noche.
+  const [volume, setVolume] = useState(1);
+  const [dim, setDim] = useState(0);
+  // Pellizcar: ajustar (contain) o rellenar (cover) la caja del reproductor.
+  const [fill, setFill] = useState(false);
+  const [hud, setHud] = useState<{label: string; value?: number} | null>(null);
   const [bandwidth, setBandwidth] = useState(0);
   // Subtítulos: pistas que anuncia el stream y la elegida ('off' = desactivados).
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
@@ -295,6 +361,8 @@ export default function VideoPlayer({
   if (subtitle !== 'off') {
     lastSubtitle.current = subtitle;
   }
+  // El usuario descartó el salto automático al siguiente en este vídeo.
+  const [nextCancelled, setNextCancelled] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
   const [scrubTime, setScrubTime] = useState(0);
   const [skipHint, setSkipHint] = useState<{side: Side; seconds: number} | null>(null);
@@ -400,6 +468,23 @@ export default function VideoPlayer({
       ? (source as {uri?: string}).uri
       : undefined;
 
+  // Preferencias: se leen por ref para no re-aplicarlas en cada render.
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
+  const onPrefsChangeRef = useRef(onPrefsChange);
+  onPrefsChangeRef.current = onPrefsChange;
+  /** Fusiona y publica el cambio; quien nos use decide dónde se guarda. */
+  const updatePrefs = useCallback((partial: Prefs) => {
+    onPrefsChangeRef.current?.({...prefsRef.current, ...partial});
+  }, []);
+  // La posición se publica cada pocos segundos, no en cada onProgress.
+  const onPositionRef = useRef(onPositionChange);
+  onPositionRef.current = onPositionChange;
+  const lastSavedAt = useRef(0);
+  // «Seguir viendo»: se aplica una vez por fuente, cuando el medio ya cargó.
+  const resumeApplied = useRef(false);
+  const prefsApplied = useRef({subtitle: false, audio: false, quality: false});
+
   // Telemetría. El callback se lee por ref para que cambiarlo no reabra sesiones.
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
@@ -437,6 +522,10 @@ export default function VideoPlayer({
     lastSubtitle.current = null;
     setAudioTracks([]);
     setAudioTrack('auto');
+    setNextCancelled(false);
+    resumeApplied.current = false;
+    prefsApplied.current = {subtitle: false, audio: false, quality: false};
+    lastSavedAt.current = 0;
     setPlayerError(null);
     setRetryAttempt(0);
     setRetryCountdown(null);
@@ -692,8 +781,133 @@ export default function VideoPlayer({
     }
   }, [boosting, canBoost]);
 
+  // Deslizar en vertical y pellizcar. Va por encima del `Pressable` de los taps:
+  // solo reclama el gesto cuando hay movimiento claro, así el tap, el doble tap y
+  // el pulsado largo siguen funcionando igual.
+  const surfaceHeight = useRef(1);
+  // Posición de la caja en la ventana: hace falta para saber en qué mitad empezó el
+  // gesto. `locationX` no sirve aquí, porque el toque empieza en el hijo y el padre
+  // se queda el gesto después.
+  const containerRef = useRef<React.ComponentRef<typeof View>>(null);
+  const surfacePageX = useRef(0);
+  const hudTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gesture = useRef({
+    mode: null as null | 'volume' | 'brightness' | 'pinch',
+    start: 0,
+    distance: 0,
+  }).current;
+  const gestureRef = useRef({verticalGestures, pinchToFill, volume, dim, compact});
+  gestureRef.current = {verticalGestures, pinchToFill, volume, dim, compact};
+
+  const showHud = useCallback((label: string, value?: number) => {
+    setHud({label, value});
+    if (hudTimer.current) {
+      clearTimeout(hudTimer.current);
+    }
+    hudTimer.current = setTimeout(() => setHud(null), 900);
+  }, []);
+
+  const touchDistance = (
+    touches: ReadonlyArray<{pageX: number; pageY: number}>,
+  ) => {
+    const [a, b] = touches;
+    return Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
+  };
+
+  const pan = useRef(
+    PanResponder.create({
+      // El tap lo sigue atendiendo el Pressable de debajo.
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponderCapture: (e, g) => {
+        const {verticalGestures: vertical, pinchToFill: pinch, compact: mini} =
+          gestureRef.current;
+        if (mini) {
+          return false;
+        }
+        if (pinch && e.nativeEvent.touches.length === 2) {
+          return true;
+        }
+        return (
+          vertical && Math.abs(g.dy) > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5
+        );
+      },
+      onPanResponderGrant: (e, g) => {
+        const touches = e.nativeEvent.touches;
+        if (touches.length === 2) {
+          gesture.mode = 'pinch';
+          gesture.distance = touchDistance(touches);
+          return;
+        }
+        const startX = g.x0 - surfacePageX.current;
+        const right = startX > surfaceWidth.current / 2;
+        gesture.mode = right ? 'volume' : 'brightness';
+        gesture.start = right
+          ? gestureRef.current.volume
+          : 1 - gestureRef.current.dim;
+      },
+      onPanResponderMove: (e, g) => {
+        if (gesture.mode === 'pinch') {
+          const touches = e.nativeEvent.touches;
+          if (touches.length < 2) {
+            return;
+          }
+          const ratio = touchDistance(touches) / (gesture.distance || 1);
+          if (ratio > 1.15) {
+            setFill(true);
+            showHud(t('gesture.fill'));
+          } else if (ratio < 0.87) {
+            setFill(false);
+            showHud(t('gesture.fit'));
+          }
+          return;
+        }
+        if (!gesture.mode) {
+          return;
+        }
+        // Todo el alto de la caja recorre el rango entero, con un poco de margen.
+        const delta = -g.dy / (surfaceHeight.current * 0.8);
+        const value = Math.max(0, Math.min(1, gesture.start + delta));
+        if (gesture.mode === 'volume') {
+          setVolume(value);
+          showHud(t('gesture.volume'), value);
+        } else {
+          // El velo es lo contrario del brillo: a menos brillo, más velo.
+          setDim(1 - value);
+          showHud(t('gesture.brightness'), value);
+        }
+      },
+      onPanResponderRelease: () => {
+        gesture.mode = null;
+      },
+      onPanResponderTerminate: () => {
+        gesture.mode = null;
+      },
+    }),
+  ).current;
+
+  useEffect(
+    () => () => {
+      if (hudTimer.current) {
+        clearTimeout(hudTimer.current);
+      }
+    },
+    [],
+  );
+
   const onLoad = (data: OnLoadData) => {
     setDuration(data.duration);
+    // «Seguir viendo»: solo en VOD, y solo la primera carga de esta fuente.
+    if (!resumeApplied.current) {
+      resumeApplied.current = true;
+      if (!data.isLive && startPosition > 0 && startPosition < data.duration) {
+        videoRef.current?.seek(startPosition);
+        setCurrentTime(startPosition);
+      }
+      const savedSpeed = prefsRef.current?.speed;
+      if (savedSpeed && savedSpeed !== 1 && !data.isLive) {
+        setRate(savedSpeed);
+      }
+    }
     setIsLive(!!data.isLive);
     setBuffering(false);
     if (data.videoTracks?.length) {
@@ -701,9 +915,11 @@ export default function VideoPlayer({
     }
     if (data.textTracks?.length) {
       setTextTracks(data.textTracks);
+      applySubtitlePref(data.textTracks);
     }
     if (data.audioTracks?.length) {
       setAudioTracks(data.audioTracks);
+      applyAudioPref(data.audioTracks);
     }
     // Cargó tras un reintento: reanudar donde estábamos (o al directo).
     if (playerKey > 0) {
@@ -731,9 +947,43 @@ export default function VideoPlayer({
 
   const onVideoTracks = (data: OnVideoTracksData) => setVideoTracks(data.videoTracks);
   const onAudioTracks = (data: OnAudioTracksData) => {
-    setAudioTracks(data.audioTracks ?? []);
+    const tracks = data.audioTracks ?? [];
+    setAudioTracks(tracks);
+    applyAudioPref(tracks);
   };
-  const onTextTracks = (data: OnTextTracksData) => setTextTracks(data.textTracks);
+
+  /** Idioma de audio recordado → índice de este stream (los índices no se guardan). */
+  const applyAudioPref = (tracks: AudioTrack[]) => {
+    const wanted = prefsRef.current?.audioLanguage;
+    if (prefsApplied.current.audio || !wanted || !tracks.length) {
+      return;
+    }
+    prefsApplied.current.audio = true;
+    const match = tracks.find(track => track.language === wanted);
+    if (match) {
+      setAudioTrack(match.index);
+    }
+  };
+
+  /** Lo mismo con los subtítulos: se recuerda el idioma, o que iban apagados. */
+  const applySubtitlePref = (tracks: TextTrack[]) => {
+    const wanted = prefsRef.current?.subtitleLanguage;
+    if (prefsApplied.current.subtitle || !wanted || !tracks.length) {
+      return;
+    }
+    prefsApplied.current.subtitle = true;
+    if (wanted === 'off') {
+      return;
+    }
+    const match = tracks.find(track => track.language === wanted);
+    if (match) {
+      setSubtitle(match.index);
+    }
+  };
+  const onTextTracks = (data: OnTextTracksData) => {
+    setTextTracks(data.textTracks);
+    applySubtitlePref(data.textTracks);
+  };
 
   const onProgress = (data: OnProgressData) => {
     currentTimeRef.current = data.currentTime;
@@ -747,6 +997,16 @@ export default function VideoPlayer({
     }
     setLiveOffset(data.liveOffset ?? -1);
     emitEvent({type: 'progress', seconds: data.currentTime});
+    // Posición para «seguir viendo»: a disco cada pocos segundos, no en cada aviso.
+    const now = Date.now();
+    if (
+      !data.isLive &&
+      data.seekableDuration > 0 &&
+      now - lastSavedAt.current > SAVE_EVERY_MS
+    ) {
+      lastSavedAt.current = now;
+      onPositionRef.current?.(data.currentTime, duration);
+    }
   };
 
   const onBuffer = (data: OnBufferData) => {
@@ -755,7 +1015,7 @@ export default function VideoPlayer({
   };
 
   const onEnd = () => {
-    if (autoplayNext && hasNext && onNext) {
+    if (autoplayNext && hasNext && onNext && !nextCancelled) {
       onNext();
       return;
     }
@@ -854,6 +1114,33 @@ export default function VideoPlayer({
     : !isLive || seekableDuration >= MIN_DVR_WINDOW_S;
   // En directo no hay saltos de ±10 s (ni botones ni doble tap).
   const canSkip = !isLive;
+  // Capítulo en curso y bloque saltable (intro) bajo el cursor.
+  const currentChapter = chapters?.find(
+    chapter => displayTime >= chapter.start && displayTime < chapter.end,
+  );
+  const showSkipIntro =
+    skipIntro &&
+    !!currentChapter?.skippable &&
+    !playerError &&
+    !casting &&
+    !pipActive &&
+    !scrubbing;
+  // Tarjeta de «a continuación»: últimos segundos de un VOD con siguiente.
+  const remaining = duration > 0 ? duration - currentTime : 0;
+  const showNextUp =
+    nextUpCard &&
+    !!nextUp &&
+    !!onNext &&
+    hasNext &&
+    !isLive &&
+    !casting &&
+    !playerError &&
+    !pipActive &&
+    !ended &&
+    !nextCancelled &&
+    duration > 0 &&
+    remaining > 0 &&
+    remaining <= NEXT_UP_S;
   // Botones de pista anterior/siguiente cuando hay lista (también en directo: una
   // lista puede tener varios canales en vivo).
   const showTrackButtons = trackButtons && (!!onNext || !!onPrevious);
@@ -915,10 +1202,16 @@ export default function VideoPlayer({
 
   return (
     <View
+      ref={containerRef}
       style={containerStyle}
       onLayout={e => {
         surfaceWidth.current = e.nativeEvent.layout.width || 1;
+        surfaceHeight.current = e.nativeEvent.layout.height || 1;
         setLayoutWidth(e.nativeEvent.layout.width || 0);
+        // La caja se mueve (miniplayer, pantalla completa): hay que remedir.
+        containerRef.current?.measureInWindow(x => {
+          surfacePageX.current = x;
+        });
       }}>
       <StatusBar hidden={fullscreen && !compact} />
 
@@ -929,11 +1222,16 @@ export default function VideoPlayer({
         style={StyleSheet.absoluteFill}
         paused={paused}
         rate={boosting ? boostRate : rate}
-        resizeMode="contain"
+        resizeMode={fill ? 'cover' : 'contain'}
+        volume={volume}
         controls={false}
         // Android: sin esta prop la librería usa la política por defecto de ExoPlayer
         // (3 reintentos y error). Con ella, los fallos de red reintentan hasta que vuelva.
         disableDisconnectError
+        // Controles del sistema: la librería publica una MediaSession con los
+        // metadatos que lleve la fuente (título, autor, carátula).
+        showNotificationControls={notificationControls && !casting}
+        playInBackground={playInBackground}
         // PiP automático al salir de la app (Android 12+ / iOS 14.2+) y manual con el botón.
         enterPictureInPictureOnLeave={pipSupported}
         onPictureInPictureStatusChanged={e => setPipActive(e.isActive)}
@@ -990,18 +1288,45 @@ export default function VideoPlayer({
 
       {/* Superficie táctil: tap, doble tap y pulsado largo. En miniplayer los gestos
           los maneja quien nos envuelve, así que aquí no se pinta nada más que el vídeo. */}
-      {!compact && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('a11y.surface')}
-          style={StyleSheet.absoluteFill}
-          onPress={onSurfacePress}
-          // Pressable no llama a onPress si ya disparó el pulsado largo, así que el
-          // x2 no choca con el tap ni con el doble tap de ±10 s.
-          delayLongPress={BOOST_HOLD_MS}
-          onLongPress={startBoost}
-          onPressOut={endBoost}
+      {/* Velo del gesto de brillo: encima del vídeo, debajo de todo lo demás. */}
+      {dim > 0 && (
+        <View
+          pointerEvents="none"
+          style={[styles.dimVeil, {opacity: dim}]}
         />
+      )}
+
+      {!compact && (
+        <View style={StyleSheet.absoluteFill} {...pan.panHandlers}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.surface')}
+            style={StyleSheet.absoluteFill}
+            onPress={onSurfacePress}
+            // Pressable no llama a onPress si ya disparó el pulsado largo, así que el
+            // x2 no choca con el tap ni con el doble tap de ±10 s.
+            delayLongPress={BOOST_HOLD_MS}
+            onLongPress={startBoost}
+            onPressOut={endBoost}
+          />
+        </View>
+      )}
+
+      {/* Aviso del gesto en curso (volumen, brillo o encuadre) */}
+      {hud && !compact && (
+        <View pointerEvents="none" style={styles.hud}>
+          <Text style={styles.hudLabel}>{hud.label}</Text>
+          {hud.value !== undefined && (
+            <View style={styles.hudTrack}>
+              <View
+                style={[
+                  styles.hudFill,
+                  {backgroundColor: accent, width: `${Math.round(hud.value * 100)}%`},
+                ]}
+              />
+            </View>
+          )}
+        </View>
       )}
 
       {/* AirPlay: el vídeo se ve en la tele; aquí queda el estado (los controles siguen
@@ -1061,6 +1386,65 @@ export default function VideoPlayer({
             {skipHint.side === 'left' ? '◀◀' : '▶▶'}
           </Text>
           <Text style={styles.skipHintText}>{skipHint.seconds} s</Text>
+        </View>
+      )}
+
+      {/* Saltar intro: va por libre, se vea o no el resto de controles (como Netflix) */}
+      {showSkipIntro && currentChapter && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('chapter.skipIntro')}
+          style={({pressed}) => [
+            styles.skipIntro,
+            {bottom: 56 + (fullscreen ? insets.bottom : 0)},
+            pressed && styles.dimmed,
+          ]}
+          onPress={() => {
+            seekTo(currentChapter.end);
+            touch();
+          }}>
+          <Text style={styles.skipIntroText}>{t('chapter.skipIntro')}</Text>
+        </Pressable>
+      )}
+
+      {/* A continuación: los últimos segundos, con cuenta atrás y salida */}
+      {showNextUp && nextUp && (
+        <View
+          style={[
+            styles.nextUp,
+            {bottom: 56 + (fullscreen ? insets.bottom : 0)},
+          ]}>
+          <Text style={styles.nextUpLabel}>{t('next.upNext')}</Text>
+          <Text style={styles.nextUpTitle} numberOfLines={1}>
+            {nextUp.title}
+          </Text>
+          <Text style={styles.nextUpCountdown}>
+            {t('next.inSeconds', {seconds: Math.ceil(remaining)})}
+          </Text>
+          <View style={styles.nextUpButtons}>
+            <Pressable
+              accessibilityRole="button"
+              style={({pressed}) => [styles.nextUpGhost, pressed && styles.dimmed]}
+              onPress={() => {
+                setNextCancelled(true);
+                touch();
+              }}>
+              <Text style={styles.nextUpGhostText}>{t('next.cancel')}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              style={({pressed}) => [
+                styles.nextUpPlay,
+                {backgroundColor: accent},
+                pressed && styles.dimmed,
+              ]}
+              onPress={() => {
+                onNext?.();
+                touch();
+              }}>
+              <Text style={styles.nextUpPlayText}>{t('next.playNow')}</Text>
+            </Pressable>
+          </View>
         </View>
       )}
 
@@ -1214,7 +1598,7 @@ export default function VideoPlayer({
           <View
             style={[styles.centerRow, previewTile && styles.hidden]}
             pointerEvents={previewTile ? 'none' : 'box-none'}>
-            {!playerError && (
+            {!playerError && !showNextUp && (
               <>
               {showTrackButtons && (
                 <Pressable
@@ -1342,6 +1726,12 @@ export default function VideoPlayer({
                   })}>
                   {formatTime(displayTime)}
                   <Text style={styles.timeDim}> / {formatTime(duration)}</Text>
+                  {currentChapter ? (
+                    <Text style={styles.timeDim} numberOfLines={1}>
+                      {'  ·  '}
+                      {currentChapter.title}
+                    </Text>
+                  ) : null}
                 </Text>
               )}
               {fullscreenButton && !casting && (
@@ -1396,6 +1786,7 @@ export default function VideoPlayer({
             {seekBar && hasDvr && !playerError ? (
               <SeekBar
                 accent={accent}
+                chapters={chapters}
                 currentTime={displayTime}
                 duration={timelineDuration}
                 buffered={isLive ? timelineDuration : buffered}
@@ -1544,6 +1935,7 @@ export default function VideoPlayer({
                   selected={q === quality}
                   onPress={() => {
                     setQuality(q);
+                    updatePrefs({quality: q});
                     setMenu(null);
                     touch();
                   }}
@@ -1581,6 +1973,7 @@ export default function VideoPlayer({
                 selected={subtitle === 'off'}
                 onPress={() => {
                   setSubtitle('off');
+                  updatePrefs({subtitleLanguage: 'off'});
                   setMenu(null);
                   touch();
                 }}
@@ -1593,6 +1986,7 @@ export default function VideoPlayer({
                   selected={track.index === subtitle}
                   onPress={() => {
                     setSubtitle(track.index);
+                    updatePrefs({subtitleLanguage: track.language ?? 'off'});
                     setMenu(null);
                     touch();
                   }}
@@ -1610,6 +2004,7 @@ export default function VideoPlayer({
                 selected={audioTrack === 'auto'}
                 onPress={() => {
                   setAudioTrack('auto');
+                  updatePrefs({audioLanguage: undefined});
                   setMenu(null);
                   touch();
                 }}
@@ -1622,6 +2017,7 @@ export default function VideoPlayer({
                   selected={track.index === audioTrack}
                   onPress={() => {
                     setAudioTrack(track.index);
+                    updatePrefs({audioLanguage: track.language});
                     setMenu(null);
                     touch();
                   }}
@@ -1644,6 +2040,7 @@ export default function VideoPlayer({
                   selected={r === rate}
                   onPress={() => {
                     setRate(r);
+                    updatePrefs({speed: r});
                     setMenu(null);
                     touch();
                   }}
@@ -1845,6 +2242,66 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   boostText: {color: '#fff', fontSize: 13, fontWeight: '700'},
+  dimVeil: {...StyleSheet.absoluteFill, backgroundColor: '#000'},
+  hud: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: '42%',
+    minWidth: 140,
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  hudLabel: {color: '#fff', fontSize: 13, fontWeight: '700'},
+  hudTrack: {
+    width: 120,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    overflow: 'hidden',
+  },
+  hudFill: {height: '100%'},
+  skipIntro: {
+    position: 'absolute',
+    right: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  skipIntroText: {color: '#fff', fontSize: 13, fontWeight: '700'},
+  nextUp: {
+    position: 'absolute',
+    right: 12,
+    maxWidth: 300,
+    backgroundColor: 'rgba(0,0,0,0.82)',
+    borderRadius: 10,
+    padding: 12,
+    gap: 2,
+  },
+  nextUpLabel: {
+    color: '#aaa',
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  nextUpTitle: {color: '#fff', fontSize: 14, fontWeight: '700'},
+  nextUpCountdown: {color: '#aaa', fontSize: 12, marginBottom: 6},
+  nextUpButtons: {flexDirection: 'row', gap: 8, justifyContent: 'flex-end'},
+  nextUpGhost: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  nextUpGhostText: {color: '#fff', fontSize: 12, fontWeight: '600'},
+  nextUpPlay: {paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16},
+  nextUpPlayText: {color: '#fff', fontSize: 12, fontWeight: '700'},
   errorOverlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.85)',

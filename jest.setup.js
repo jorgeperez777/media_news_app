@@ -8,6 +8,25 @@ jest.mock('@react-native-community/netinfo', () => ({
   },
 }));
 
+// AsyncStorage 3 ya no trae mock propio: uno en memoria basta para el render.
+jest.mock('@react-native-async-storage/async-storage', () => {
+  const store = new Map();
+  return {
+    __esModule: true,
+    default: {
+      getItem: jest.fn(key => Promise.resolve(store.get(key) ?? null)),
+      setItem: jest.fn((key, value) => {
+        store.set(key, value);
+        return Promise.resolve();
+      }),
+      removeItem: jest.fn(key => {
+        store.delete(key);
+        return Promise.resolve();
+      }),
+    },
+  };
+});
+
 jest.mock('react-native-orientation-locker', () => ({
   __esModule: true,
   default: {

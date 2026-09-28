@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import SOURCES, {VOD_ITEMS} from '../sources';
+import {t} from '../i18n';
 import {usePlayer} from '../player/PlayerContext';
 
 /**
@@ -71,26 +72,27 @@ export default function DetailScreen() {
         <Text style={styles.heading}>{current.title}</Text>
         <Text style={styles.description}>{current.description}</Text>
         <Text style={styles.hint}>
-          Tap: mostrar/ocultar controles · Doble tap en los lados: ±10 s ·
-          Mantén pulsado: x2 mientras no sueltes · Arrastra la barra roja para
-          buscar · ⏮ ⏭ cambian de vídeo (
-          {VOD_ITEMS.findIndex(item => item.index === index) + 1}/
-          {VOD_ITEMS.length}) · ⌄ (junto al título) manda el vídeo al miniplayer
+          {t('screen.detailHint', {
+            position: VOD_ITEMS.findIndex(item => item.index === index) + 1,
+            total: VOD_ITEMS.length,
+          })}
         </Text>
         <View style={styles.actions}>
           <Pressable
             onPress={player.minimize}
             style={({pressed}) => [styles.button, pressed && styles.buttonPressed]}>
-            <Text style={styles.buttonText}>Minimizar</Text>
+            <Text style={styles.buttonText}>{t('screen.minimize')}</Text>
           </Pressable>
           <Pressable
             onPress={player.close}
             style={({pressed}) => [styles.button, pressed && styles.buttonPressed]}>
-            <Text style={styles.buttonText}>Cerrar</Text>
+            <Text style={styles.buttonText}>{t('screen.close')}</Text>
           </Pressable>
         </View>
         {player.error ? (
-          <Text style={styles.error}>Error: {player.error}</Text>
+          <Text style={styles.error}>
+            {t('screen.error', {message: player.error})}
+          </Text>
         ) : null}
       </ScrollView>
     </View>

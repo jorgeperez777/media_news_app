@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {VOD_ITEMS} from '../sources';
 import {usePlayer} from '../player/PlayerContext';
@@ -6,10 +6,17 @@ import {t} from '../i18n';
 import {MINI_HEIGHT} from '../components/PlayerHost';
 import {TAB_BAR_HEIGHT} from '../components/TabBar';
 import {PlayIcon} from '../components/icons';
+import {formatTime} from '../components/format';
+import {loadPositions, type Positions} from '../player/storage';
 
 /** Lista de vídeos. Tocar uno abre el detalle con el reproductor. */
 export default function ListScreen() {
   const player = usePlayer();
+  // «Seguir viendo»: se relee al volver de un vídeo (cambia player.index).
+  const [positions, setPositions] = useState<Positions>({});
+  useEffect(() => {
+    loadPositions().then(setPositions);
+  }, [player.index]);
 
   return (
     <ScrollView
@@ -42,10 +49,30 @@ export default function ListScreen() {
             <Text style={styles.rowSubtitle} numberOfLines={2}>
               {item.label} · {item.description}
             </Text>
+            {renderResume(positions, item.source.uri)}
           </View>
         </Pressable>
       ))}
     </ScrollView>
+  );
+}
+
+/** Barra de lo ya visto y el tiempo, cuando hay posición guardada. */
+function renderResume(positions: Positions, uri: string) {
+  const saved = positions[uri];
+  if (!saved || saved.duration <= 0) {
+    return null;
+  }
+  const percent = Math.min(100, (saved.seconds / saved.duration) * 100);
+  return (
+    <View style={styles.resume}>
+      <View style={styles.resumeTrack}>
+        <View style={[styles.resumeFill, {width: `${percent}%`}]} />
+      </View>
+      <Text style={styles.resumeText}>
+        {t('screen.continueWatching', {position: formatTime(saved.seconds)})}
+      </Text>
+    </View>
   );
 }
 
@@ -67,4 +94,13 @@ const styles = StyleSheet.create({
   rowText: {flex: 1, gap: 4},
   rowTitle: {color: '#fff', fontSize: 15, fontWeight: '600'},
   rowSubtitle: {color: '#aaa', fontSize: 12, lineHeight: 16},
+  resume: {gap: 4, marginTop: 2},
+  resumeTrack: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    overflow: 'hidden',
+  },
+  resumeFill: {height: '100%', backgroundColor: '#ff0000'},
+  resumeText: {color: '#888', fontSize: 11},
 });

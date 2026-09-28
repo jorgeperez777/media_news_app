@@ -15,6 +15,8 @@ type Props = {
   accent?: string;
   /** Salto de los gestos de accesibilidad (incrementar/decrementar), en segundos. */
   step?: number;
+  /** Capítulos: se dibuja una muesca en cada corte, como en YouTube. */
+  chapters?: Array<{start: number; end: number}>;
 };
 
 const TRACK_HEIGHT = 3;
@@ -30,6 +32,7 @@ export default function SeekBar(props: Props) {
     scrubbing,
     accent = '#ff0000',
     step = 10,
+    chapters,
   } = props;
   const widthRef = useRef(1);
   const startXRef = useRef(0);
@@ -99,6 +102,17 @@ export default function SeekBar(props: Props) {
       {...pan.panHandlers}>
       <View style={[styles.track, {height: trackHeight}]}>
         <View style={[styles.buffered, {width: pct(buffered)}]} />
+        {/* Muescas de capítulo: cortes sobre la pista, debajo del progreso. */}
+        {duration > 0 &&
+          chapters
+            ?.filter(chapter => chapter.start > 0 && chapter.start < duration)
+            .map(chapter => (
+              <View
+                key={chapter.start}
+                pointerEvents="none"
+                style={[styles.chapterMark, {left: pct(chapter.start)}]}
+              />
+            ))}
         <View
           style={[styles.progress, {backgroundColor: accent, width: pct(currentTime)}]}
         />
@@ -147,5 +161,13 @@ const styles = StyleSheet.create({
   },
   thumb: {
     position: 'absolute',
+  },
+  chapterMark: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 2,
+    marginLeft: -1,
+    backgroundColor: '#0f0f0f',
   },
 });

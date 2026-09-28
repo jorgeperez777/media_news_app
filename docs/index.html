@@ -121,6 +121,13 @@
     <a href="#subtitulos">Subtítulos</a>
     <a href="#calidad">Calidad y datos</a>
     <a href="#preview">Vista previa</a>
+    <a href="#audio">Pistas de audio</a>
+    <a href="#chapters">Capítulos y siguiente</a>
+    <a href="#gestures">Gestos</a>
+    <a href="#continue">Seguir viendo</a>
+    <a href="#qoe">Telemetría (QoE)</a>
+    <a href="#a11y">Accesibilidad</a>
+    <a href="#i18n">Idiomas</a>
     <a href="#pip">Picture in Picture</a>
     <a href="#cast">Cast y AirPlay</a>
     <a href="#errores">Errores</a>
@@ -192,6 +199,14 @@
     <tr><td><code>accent</code></td><td><code>string</code></td><td><code>'#ff0000'</code></td><td>Color de la barra de progreso y de todo lo que indica «activo». Ver <a href="#accent">accent</a>.</td></tr>
     <tr><td><code>features</code></td><td><code>PlayerFeatures</code></td><td><code>{}</code> (todo activo)</td><td>Qué controles se ofrecen. Ver <a href="#features">features</a>.</td></tr>
     <tr><td><code>storyboard</code></td><td><code>StoryboardSource</code></td><td>—</td><td>Miniaturas para la vista previa de la barra. Ver <a href="#preview">vista previa</a>.</td></tr>
+    <tr><td><code>chapters</code></td><td><code>Chapter[]</code></td><td>—</td><td>Tramos con nombre: muescas en la barra, título junto al tiempo y «Saltar intro» en los marcados <code>skippable</code>.</td></tr>
+    <tr><td><code>nextUp</code></td><td><code>{title}</code></td><td>—</td><td>Qué viene después: saca la tarjeta de continuidad en los últimos 10 s.</td></tr>
+    <tr><td><code>startPosition</code></td><td><code>number</code></td><td><code>0</code></td><td>Segundo por el que arrancar («seguir viendo»). Se ignora en directo.</td></tr>
+    <tr><td><code>onPositionChange</code></td><td><code>(seconds, duration) =&gt; void</code></td><td>—</td><td>Posición cada 5 s, para que quien lo use la guarde.</td></tr>
+    <tr><td><code>prefs</code> / <code>onPrefsChange</code></td><td><code>Prefs</code></td><td>—</td><td>Idioma de subtítulos y de audio, calidad y velocidad recordados entre sesiones.</td></tr>
+    <tr><td><code>onEvent</code></td><td><code>(event: PlaybackEvent) =&gt; void</code></td><td>—</td><td>Hechos de reproducción para telemetría. Ver <a href="#qoe">QoE</a>.</td></tr>
+    <tr><td><code>notificationControls</code></td><td><code>boolean</code></td><td><code>true</code></td><td>Controles del sistema (notificación / pantalla de bloqueo) con los metadatos de la fuente.</td></tr>
+    <tr><td><code>playInBackground</code></td><td><code>boolean</code></td><td><code>false</code></td><td>Seguir sonando con la app en segundo plano.</td></tr>
     <tr><td><code>compact</code></td><td><code>boolean</code></td><td><code>false</code></td><td>Modo miniplayer: solo el vídeo, sin overlay ni gestos; los controles los dibuja quien lo envuelve.</td></tr>
     <tr><td><code>paused</code></td><td><code>boolean</code></td><td>—</td><td>Pausa controlada desde fuera. Si se pasa, manda el padre (necesario para compartir estado con un miniplayer); si no, el reproductor la gestiona solo.</td></tr>
     <tr><td><code>onPausedChange</code></td><td><code>(paused: boolean) =&gt; void</code></td><td>—</td><td>Avisa de cada cambio de pausa, venga del botón, del gesto o del final del vídeo.</td></tr>
@@ -232,6 +247,10 @@
     <tr><td><code>pipButton</code></td><td>El botón ▭ (que además necesita que el dispositivo soporte PiP).</td></tr>
     <tr><td><code>routeButtons</code></td><td>Los botones de Chromecast y AirPlay.</td></tr>
     <tr><td><code>fullscreenButton</code></td><td>El botón ⤢ de pantalla completa.</td></tr>
+    <tr><td><code>skipIntro</code></td><td>El botón «Saltar intro» de los capítulos saltables.</td></tr>
+    <tr><td><code>nextUpCard</code></td><td>La tarjeta de «a continuación» de los últimos segundos.</td></tr>
+    <tr><td><code>verticalGestures</code></td><td>Deslizar arriba/abajo: volumen (derecha) y brillo (izquierda).</td></tr>
+    <tr><td><code>pinchToFill</code></td><td>Pellizcar para ajustar o rellenar.</td></tr>
   </tbody>
 </table>
 <div class="note">
@@ -392,6 +411,84 @@ ffmpeg -i entrada.m3u8 -vf "fps=1/5,scale=160:-1,tile=12x11" -frames:v 1 salida.
   sprites en continuo desde el servidor, y al transmitir manda el receptor. Miniaturas de
   120 px cuestan ~7,8 MB de native heap mientras se ven; con 160 px eran 11,5 MB.
 </div>
+
+<h2 id="audio">Pistas de audio</h2>
+<p>
+  Igual que los subtítulos: las pistas salen del stream (<code>onAudioTracks</code> y
+  <code>onLoad</code>) y se eligen en ⚙ › Audio. La fila solo se ofrece cuando hay más
+  de una; «Predeterminado» deja mandar al sistema, que es quien casa el idioma del
+  dispositivo con el del stream.
+</p>
+
+<h2 id="chapters">Capítulos, saltar intro y «a continuación»</h2>
+<pre><code>chapters={[
+  {title: 'Intro', start: 0, end: 33, skippable: true},
+  {title: 'El prado', start: 33, end: 190},
+]}
+nextUp={{title: 'Siguiente episodio'}}</code></pre>
+<ul>
+  <li>Cada corte dibuja una muesca en la barra, y el capítulo en curso sale junto al tiempo.</li>
+  <li>Dentro de un tramo <code>skippable</code> aparece <strong>Saltar intro</strong>, se vean o no los controles (como en Netflix); al pulsarlo salta a <code>end</code>.</li>
+  <li>En los últimos 10 s de un VOD con siguiente sale la tarjeta de <strong>a continuación</strong>, con cuenta atrás, «Reproducir ya» y «Cancelar». Cancelar desactiva también el autoplay de ese vídeo.</li>
+</ul>
+
+<h2 id="gestures">Gestos verticales y pellizco</h2>
+<ul>
+  <li><strong>Mitad derecha, arriba/abajo:</strong> volumen del reproductor, con aviso en pantalla.</li>
+  <li><strong>Mitad izquierda, arriba/abajo:</strong> brillo. Sin módulo nativo no se puede subir el brillo del sistema, así que lo que se ajusta es un velo negro sobre el vídeo: <strong>oscurece</strong>, que es para lo que se usa de noche.</li>
+  <li><strong>Pellizcar:</strong> alterna <code>resizeMode</code> entre <code>contain</code> (ajustar) y <code>cover</code> (rellenar).</li>
+</ul>
+<p class="muted">
+  Los gestos viven en un <code>PanResponder</code> por encima del <code>Pressable</code>
+  de los taps, y solo reclaman el gesto con movimiento vertical claro o con dos dedos:
+  el tap, el doble tap y el pulsado largo siguen intactos.
+</p>
+
+<h2 id="continue">Seguir viendo y preferencias</h2>
+<p>
+  El reproductor no guarda nada por su cuenta: publica la posición cada 5 s
+  (<code>onPositionChange</code>) y los cambios de ajustes (<code>onPrefsChange</code>), y
+  quien lo usa decide dónde van. En esta app van a AsyncStorage
+  (<code>player/storage.ts</code>), y la lista enseña la barra de lo ya visto.
+</p>
+<ul>
+  <li>No se recuerda por debajo de 15 s ni a menos de 20 s del final: ahí lo natural es empezar de cero.</li>
+  <li>De los subtítulos y del audio se guarda el <strong>idioma</strong>, no el índice: los índices cambian de un stream a otro.</li>
+  <li>También se recuerdan calidad, velocidad y ahorro de datos.</li>
+</ul>
+
+<h2 id="qoe">Telemetría (QoE)</h2>
+<p>
+  <code>onEvent</code> emite hechos —arranque, buffers, progreso, saltos, errores y
+  bitrate— y <code>player/telemetry.ts</code> los agrega por sesión:
+</p>
+<table>
+  <thead><tr><th>Métrica</th><th>Qué dice</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Arranque</strong></td><td>Del primer byte pedido al primer fotograma (<code>onReadyForDisplay</code>).</td></tr>
+    <tr><td><strong>Rebuffers</strong> y su <strong>ratio</strong></td><td>Cortes después del arranque, y qué fracción del tiempo se pasó parado. Es el número que manda en QoE.</td></tr>
+    <tr><td><strong>Visto</strong></td><td>Tiempo de vídeo consumido de verdad (los saltos no cuentan).</td></tr>
+    <tr><td><strong>Saltos, errores y bitrate medio</strong></td><td>Lo demás que se mira al triangular una queja.</td></tr>
+  </tbody>
+</table>
+<p class="muted">
+  En la app se ven en la pestaña Perfil; en producción, ese mismo objeto es lo que se
+  manda al servidor.
+</p>
+
+<h2 id="a11y">Accesibilidad</h2>
+<ul>
+  <li>Todos los controles llevan rol y etiqueta traducida, y estado donde importa (CC activo, EN VIVO cuando ya estás en directo).</li>
+  <li>La barra de progreso es un control <strong>ajustable</strong>: con lector de pantalla se mueve con los gestos de incrementar y decrementar, ±10 s, sin arrastrar.</li>
+  <li>La superficie del vídeo se anuncia y explica qué hace el tap.</li>
+</ul>
+
+<h2 id="i18n">Idiomas</h2>
+<p>
+  Los textos están en <code>i18n/</code> (español e inglés) y el idioma sale del locale
+  del dispositivo vía <code>Intl</code>, sin dependencias nativas. Añadir un idioma es
+  añadir un diccionario con las mismas claves.
+</p>
 
 <h2 id="pip">Picture in Picture</h2>
 <p>

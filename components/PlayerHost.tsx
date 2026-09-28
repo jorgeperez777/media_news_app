@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -12,6 +12,15 @@ import {usePlayer} from '../player/PlayerContext';
 import {TAB_BAR_HEIGHT} from './TabBar';
 import VideoPlayer from './VideoPlayer';
 import {record} from '../player/telemetry';
+import {
+  loadPositions,
+  loadPrefs,
+  resumeFrom,
+  savePosition,
+  savePrefs,
+  type Positions,
+  type Prefs,
+} from '../player/storage';
 import {CloseIcon, PauseIcon, PlayIcon} from './icons';
 
 /** Alto de la barra del miniplayer y ancho del vídeo dentro de ella (16:9). */
@@ -31,6 +40,47 @@ const MINI_VIDEO_WIDTH = MINI_HEIGHT * (16 / 9);
  */
 export default function PlayerHost() {
   const player = usePlayer();
+  // Lo que sobrevive a cerrar la app: preferencias y dónde ibas en cada vídeo.
+  const [prefs, setPrefs] = useState<Prefs>({});
+  const [positions, setPositions] = useState<Positions>({});
+  const setDataSaver = player.setDataSaver;
+
+  // Hasta que no se ha leído lo guardado no se escribe nada: si no, el primer
+  // render (con las preferencias vacías) pisaría el disco.
+  const loaded = useRef(false);
+  useEffect(() => {
+    loadPositions().then(setPositions);
+    loadPrefs().then(saved => {
+      setPrefs(saved);
+      if (saved.dataSaver) {
+        setDataSaver(saved.dataSaver);
+      }
+      loaded.current = true;
+    });
+  }, [setDataSaver]);
+
+  /** Guarda y recuerda: el reproductor solo avisa de lo que el usuario cambió. */
+  const persistPrefs = useCallback((next: Prefs) => {
+    setPrefs(next);
+    savePrefs(next);
+  }, []);
+
+  // El ahorro de datos vive en el contexto (sobrevive al cambio de vídeo), así que
+  // se persiste desde aquí cuando cambia.
+  const dataSaver = player.dataSaver;
+  useEffect(() => {
+    if (!loaded.current) {
+      return;
+    }
+    setPrefs(current => {
+      if (current.dataSaver === dataSaver) {
+        return current;
+      }
+      const next = {...current, dataSaver};
+      savePrefs(next);
+      return next;
+    });
+  }, [dataSaver]);
   const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -64,6 +114,8 @@ export default function PlayerHost() {
   }
 
   const current = SOURCES[index];
+  const sourceUri =
+    'uri' in current.source ? (current.source as {uri: string}).uri : undefined;
   const isMini = mode === 'mini';
   const box = isMini ? mini : full;
 
@@ -89,6 +141,19 @@ export default function PlayerHost() {
             reproductor nativo no se recrea (ver el reset en VideoPlayer). */}
         <VideoPlayer
           onEvent={record}
+          startPosition={resumeFrom(positions, sourceUri)}
+          onPositionChange={(seconds, duration) => {
+            if (!sourceUri) {
+              return;
+            }
+            savePosition(sourceUri, seconds, duration);
+            setPositions(saved => ({
+              ...saved,
+              [sourceUri]: {seconds, duration, updatedAt: Date.now()},
+            }));
+          }}
+          prefs={prefs}
+          onPrefsChange={persistPrefs}
           source={current.source}
           title={current.title}
           style={styles.video}
@@ -96,6 +161,12 @@ export default function PlayerHost() {
           paused={player.paused}
           onPausedChange={player.setPaused}
           storyboard={current.storyboard}
+          chapters={current.chapters}
+          nextUp={
+            player.nextIndex !== null
+              ? {title: SOURCES[player.nextIndex].title}
+              : undefined
+          }
           dataSaver={player.dataSaver}
           onDataSaverChange={player.setDataSaver}
           onError={player.setError}
