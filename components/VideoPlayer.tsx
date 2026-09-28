@@ -20,6 +20,7 @@ import Orientation from 'react-native-orientation-locker';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Video, {
   AirPlayButton,
+  isPictureInPictureSupported,
   SelectedTrackType,
   SelectedVideoTrackType,
   type OnBufferData,
@@ -186,6 +187,13 @@ export default function VideoPlayer({
   // Picture in Picture. En Android la ventana PiP muestra la Activity entera escalada,
   // así que mientras está activo ocultamos los controles y el vídeo ocupa todo.
   const [pipActive, setPipActive] = useState(false);
+  // PiP no existe en todos los sitios (el simulador de iOS no lo soporta, y en
+  // Android hace falta que el dispositivo declare la característica). Sin soporte,
+  // entrar en PiP no falla: no hace nada. Así que mejor no ofrecer el botón.
+  const [pipSupported, setPipSupported] = useState(false);
+  useEffect(() => {
+    isPictureInPictureSupported().then(setPipSupported);
+  }, []);
   // AirPlay (iOS): AVPlayer enruta el vídeo él mismo; aquí solo sabemos que está activo
   // y a qué dispositivo va, para avisarlo en pantalla.
   const [airplay, setAirplay] = useState<{active: boolean; deviceName?: string | null}>({
@@ -773,7 +781,7 @@ export default function VideoPlayer({
         // (3 reintentos y error). Con ella, los fallos de red reintentan hasta que vuelva.
         disableDisconnectError
         // PiP automático al salir de la app (Android 12+ / iOS 14.2+) y manual con el botón.
-        enterPictureInPictureOnLeave
+        enterPictureInPictureOnLeave={pipSupported}
         onPictureInPictureStatusChanged={e => setPipActive(e.isActive)}
         // AirPlay: el vídeo sale por la tele, pero lo sigue reproduciendo este <Video>,
         // así que los controles valen igual; solo cambia lo que se ve en el móvil.
@@ -968,7 +976,7 @@ export default function VideoPlayer({
                   <SubtitlesIcon active={subtitle !== 'off'} />
                 </Pressable>
               )}
-              {!playerError && !casting && !airplay.active && (
+              {pipSupported && !playerError && !casting && !airplay.active && (
                 <Pressable
                   hitSlop={12}
                   style={styles.iconButton}

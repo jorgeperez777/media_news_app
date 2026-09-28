@@ -162,7 +162,7 @@ geometría de Material Symbols: un viewBox 24×24 común, color y tamaño por pr
 | CC (arriba derecha) | Enciende/apaga los subtítulos; solo aparece si el vídeo trae pistas. Azul = activos |
 | ⛶ (abajo derecha) | Pantalla completa: rota a horizontal, botón atrás sale |
 | Spinner | Mientras hace buffering |
-| ▭ (arriba derecha, junto a ⚙) | Picture in Picture manual; también entra solo al salir de la app (`enterPictureInPictureOnLeave`) |
+| ▭ (arriba derecha, junto a ⚙) | Picture in Picture manual; también entra solo al salir de la app (`enterPictureInPictureOnLeave`). Solo aparece donde el dispositivo lo soporta |
 | Botón de cast / AirPlay (arriba derecha) | Envía el vídeo a un Chromecast o a AirPlay (ver [Chromecast y AirPlay](#chromecast-y-airplay)) |
 
 ### Vista previa en la barra (storyboard)
@@ -299,6 +299,11 @@ y volver al directo es `seek(currentTime + liveOffset)`.
   con `restoreUserInterfaceForPictureInPictureStopCompleted(true)` porque el reproductor
   sigue montado. **No funciona en el simulador de iPhone** (`isPictureInPictureSupported`
   = NO); pruébalo en un dispositivo real.
+- El botón ▭ solo se dibuja donde hay soporte: al montar, el reproductor pregunta a la
+  librería con `isPictureInPictureSupported()` (iOS: `AVPictureInPictureController`;
+  Android: API 26+ y la característica `android.software.picture_in_picture`). Sin
+  soporte, entrar en PiP no falla —no hace nada—, así que un botón muerto solo
+  confunde; por lo mismo, `enterPictureInPictureOnLeave` también se desactiva.
 
 ### Chromecast y AirPlay
 
