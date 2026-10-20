@@ -60,3 +60,7 @@ jest.mock('react-native-video', () => {
     SelectedVideoTrackType: {AUTO: 'auto', RESOLUTION: 'resolution'},
   };
 });
+
+
+// Lottie es una vista nativa; en tests no hay nada que animar.
+jest.mock('lottie-react-native', () => ({__esModule: true, default: () => null}));

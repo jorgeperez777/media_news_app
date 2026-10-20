@@ -7,8 +7,8 @@ import React, {
   useState,
 } from 'react';
 import type {View} from 'react-native';
-import SOURCES from '../sources';
-import type {DataSaver} from '../components/useNetworkCap';
+import SOURCES, {ensureStream} from '../sources';
+import type {DataSaver} from 'react-native-video/controls';
 
 /** Caja (en coordenadas de ventana) donde debe verse el reproductor expandido. */
 export type Anchor = {x: number; y: number; width: number; height: number};
@@ -31,10 +31,23 @@ type PlayerState = {
   anchor: Anchor | null;
   /** Ahorro de datos; vive aquí para no perderse al cambiar de vídeo. */
   dataSaver: DataSaver;
+  /**
+   * Empezar desde el principio aunque haya posición guardada («ver desde el
+   * principio»). Solo vale para la apertura: en cuanto se cambia de episodio
+   * vuelve a mandar lo guardado.
+   */
+  fromStart: boolean;
 };
 
 type PlayerApi = PlayerState & {
-  open: (index: number, options?: {presentation?: 'inline' | 'immersive'}) => void;
+  open: (
+    index: number,
+    options?: {
+      presentation?: 'inline' | 'immersive';
+      /** Ignorar la posición guardada y empezar en 0. */
+      fromStart?: boolean;
+    },
+  ) => void;
   close: () => void;
   minimize: () => void;
   expand: () => void;
@@ -81,21 +94,35 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
   const [error, setError] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const [dataSaver, setDataSaver] = useState<DataSaver>('auto');
+  const [fromStart, setFromStart] = useState(false);
   const rootRef = useRef<React.ComponentRef<typeof View> | null>(null);
 
   const open = useCallback(
-    (next: number, options?: {presentation?: 'inline' | 'immersive'}) => {
+    (
+      next: number,
+      options?: {
+        presentation?: 'inline' | 'immersive';
+        fromStart?: boolean;
+      },
+    ) => {
       setIndex(next);
       setMode('full');
       setPresentation(options?.presentation ?? 'inline');
+      setFromStart(options?.fromStart ?? false);
       setPaused(false);
       setError(null);
+      // Las películas del archivo llegan sin vídeo: se pide aquí, mientras el
+      // reproductor ya está en pantalla enseñando su spinner (ver PlayerHost).
+      ensureStream(next).catch((problem: Error) =>
+        setError(problem.message ?? String(problem)),
+      );
     },
     [],
   );
 
   const close = useCallback(() => {
     setIndex(null);
+    setFromStart(false);
     setMode('full');
     setPresentation('inline');
     setFullscreen(false);
@@ -105,6 +132,8 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
 
   const goTo = useCallback((next: number) => {
     setIndex(Math.max(0, Math.min(SOURCES.length - 1, next)));
+    // Al cambiar de episodio vuelve a mandar lo guardado.
+    setFromStart(false);
     setPaused(false);
     setError(null);
   }, []);
@@ -139,6 +168,7 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
       error,
       anchor,
       dataSaver,
+      fromStart,
       open,
       close,
       minimize: () => setMode('mini'),
@@ -169,6 +199,7 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
       close,
       goTo,
       dataSaver,
+      fromStart,
       previousIndex,
       nextIndex,
     ],

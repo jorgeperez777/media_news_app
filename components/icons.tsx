@@ -1,11 +1,18 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
-import Svg, {Path} from 'react-native-svg';
+import Svg, {Defs, LinearGradient, Path, Stop} from 'react-native-svg';
+import {ACCENT, ACCENT_END} from '../theme';
 
 // Iconos vectoriales (react-native-svg) con la geometría de Material Symbols:
 // un único viewBox 24x24 para todos, así comparten grosor y peso óptico.
 
 const WHITE = '#fff';
+
+/**
+ * Pasado como `color`, el icono se pinta con el **degradado** de la marca en vez
+ * de con un color plano (ver `theme`). Es lo que lleva la pestaña elegida.
+ */
+export const GRADIENT = 'gradient';
 
 type IconProps = {size?: number; color?: string};
 
@@ -15,9 +22,20 @@ function Icon({
   color = WHITE,
   path,
 }: {size: number; color?: string; path: string}) {
+  // Un id por icono montado: dos degradados con el mismo id se pisan.
+  const id = `i${React.useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  const gradient = color === GRADIENT;
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d={path} fill={color} />
+      {gradient ? (
+        <Defs>
+          <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={ACCENT} />
+            <Stop offset="1" stopColor={ACCENT_END} />
+          </LinearGradient>
+        </Defs>
+      ) : null}
+      <Path d={path} fill={gradient ? `url(#${id})` : color} />
     </Svg>
   );
 }
@@ -33,6 +51,10 @@ const PATHS = {
   chevronDown: 'M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z',
   fastForward: 'M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z',
   skipNext: 'M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z',
+  add: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
+  check: 'M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z',
+  share:
+    'M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.8.43-.8.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z',
   skipPrevious: 'M6 6h2v12H6zm3.5 6 8.5 6V6z',
   fullscreen:
     'M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z',
@@ -63,6 +85,10 @@ const PATHS = {
   lockOpen:
     'M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h2c0-1.66 1.34-3 3-3s3 1.34 3 3v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z',
   episodes: 'M4 6h12v2H4zm0 4h12v2H4zm0 4h8v2H4zm10 0v6l5-3z',
+  home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
+  news: 'M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H4V5h16v14zM6 7h7v6H6zm8 0h4v2h-4zm0 4h4v2h-4zM6 15h12v2H6z',
+  favorite:
+    'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54z',
 };
 
 export function PlayIcon({size = 36, color}: IconProps) {
@@ -182,6 +208,30 @@ export function SubtitlesIcon({
   return (
     <Icon size={size} color={active ? activeColor : color} path={PATHS.closedCaption} />
   );
+}
+
+export function AddIcon({size = 22, color}: IconProps) {
+  return <Icon size={size} color={color} path={PATHS.add} />;
+}
+
+export function CheckIcon({size = 22, color}: IconProps) {
+  return <Icon size={size} color={color} path={PATHS.check} />;
+}
+
+export function ShareIcon({size = 22, color}: IconProps) {
+  return <Icon size={size} color={color} path={PATHS.share} />;
+}
+
+export function HomeIcon({size = 22, color}: IconProps) {
+  return <Icon size={size} color={color} path={PATHS.home} />;
+}
+
+export function NewsIcon({size = 22, color}: IconProps) {
+  return <Icon size={size} color={color} path={PATHS.news} />;
+}
+
+export function FavoriteIcon({size = 22, color}: IconProps) {
+  return <Icon size={size} color={color} path={PATHS.favorite} />;
 }
 
 export function LiveTvIcon({size = 22, color}: IconProps) {

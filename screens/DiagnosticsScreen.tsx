@@ -1,11 +1,19 @@
 import React, {useSyncExternalStore} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {TAB_BAR_HEIGHT} from '../components/TabBar';
+import {useTabBarSpace} from '../components/TabBar';
 import {MINI_HEIGHT} from '../components/PlayerHost';
-import {formatTime} from '../components/VideoPlayer';
-import {mbps} from '../components/useNetworkCap';
-import {t} from '../i18n';
+import {formatTime, mbps} from 'react-native-video/controls';
+import {
+  getLanguagePreference,
+  setLanguage,
+  t,
+  useLanguage,
+  LANGUAGES,
+  type LanguagePreference,
+} from '../i18n';
 import {usePlayer} from '../player/PlayerContext';
+import {catalogState, loadTmdbCatalog, tmdbCount, useCatalog} from '../sources';
+import {saveLanguage} from '../player/storage';
 import {
   clearSessions,
   getSessions,
@@ -20,6 +28,7 @@ import {
  */
 export default function DiagnosticsScreen() {
   const player = usePlayer();
+  const tabBarSpace = useTabBarSpace();
   const sessions = useSyncExternalStore(subscribe, getSessions);
 
   return (
@@ -28,11 +37,20 @@ export default function DiagnosticsScreen() {
         styles.container,
         {
           paddingBottom:
-            TAB_BAR_HEIGHT +
+            tabBarSpace +
             16 +
             (player.index !== null && player.mode === 'mini' ? MINI_HEIGHT : 0),
         },
       ]}>
+      <LanguagePicker />
+
+      <TmdbCatalog />
+
+      {/* Atribución: TMDb la exige en sus términos cuando usas su API. */}
+      <Text style={styles.heading}>{t('credits.title')}</Text>
+      <Text style={styles.hint}>{t('credits.tmdb')}</Text>
+      <Text style={styles.hint}>{t('credits.archive')}</Text>
+
       <Text style={styles.heading}>{t('qoe.title')}</Text>
       <Text style={styles.hint}>{t('qoe.intro')}</Text>
 
@@ -57,6 +75,46 @@ export default function DiagnosticsScreen() {
         </>
       )}
     </ScrollView>
+  );
+}
+
+/** Idioma de la app: automático (el del dispositivo) o uno fijo. */
+function LanguagePicker() {
+  // Repinta al cambiar: el elegido se lee del módulo, no de un estado local.
+  useLanguage();
+  const current = getLanguagePreference();
+  const options: LanguagePreference[] = ['auto', ...LANGUAGES];
+
+  const choose = (next: LanguagePreference) => {
+    setLanguage(next);
+    saveLanguage(next);
+  };
+
+  return (
+    <View style={styles.language}>
+      <Text style={styles.heading}>{t('settings.language')}</Text>
+      <View style={styles.languageRow}>
+        {options.map(option => {
+          const selected = option === current;
+          return (
+            <Pressable
+              key={option}
+              accessibilityRole="button"
+              accessibilityState={{selected}}
+              onPress={() => choose(option)}
+              style={({pressed}) => [
+                styles.chip,
+                selected && styles.chipOn,
+                pressed && styles.pressed,
+              ]}>
+              <Text style={[styles.chipText, selected && styles.chipTextOn]}>
+                {t(`language.${option}`)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -128,8 +186,55 @@ function Metric({
   );
 }
 
+/**
+ * Catálogo de pruebas de TMDb, a mano.
+ *
+ * A mano y aquí dentro a propósito: son miles de peticiones de fichas que no
+ * tienen película detrás (ver `loadTmdbCatalog`), así que esto no se carga solo
+ * al arrancar ni se ofrece en la navegación normal.
+ */
+function TmdbCatalog() {
+  useCatalog();
+  const {loading} = catalogState();
+  const count = tmdbCount();
+
+  return (
+    <>
+      <Text style={styles.heading}>{t('tmdb.title')}</Text>
+      <Text style={styles.hint}>{t('tmdb.intro')}</Text>
+      <View style={styles.actions}>
+        <Text style={styles.count}>{t('tmdb.loaded', {count})}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{disabled: loading}}
+          disabled={loading}
+          onPress={() => loadTmdbCatalog()}
+          style={({pressed}) => [
+            styles.button,
+            (pressed || loading) && styles.pressed,
+          ]}>
+          <Text style={styles.buttonText}>
+            {t(loading ? 'tmdb.loading' : 'tmdb.load')}
+          </Text>
+        </Pressable>
+      </View>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {padding: 16, gap: 10},
+  language: {gap: 10, marginBottom: 6},
+  languageRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  chipOn: {backgroundColor: '#fff'},
+  chipText: {color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600'},
+  chipTextOn: {color: '#0f0f0f'},
   heading: {color: '#fff', fontSize: 22, fontWeight: '700'},
   hint: {color: '#aaa', fontSize: 13, lineHeight: 18},
   empty: {color: '#777', fontSize: 13, marginTop: 8},

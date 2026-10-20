@@ -1,21 +1,22 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import type {TabKey} from '../components/TabBar';
-import {t} from '../i18n';
+import {t, type TextKey} from '../i18n';
 
-// Perfil tiene su propia pantalla (el panel de QoE); aquí solo queda Buscar.
+// El resto de pestañas tiene pantalla propia; Buscar sigue siendo de ejemplo.
 type PlaceholderTab = Extract<TabKey, 'buscar'>;
 
-const COPY: Record<PlaceholderTab, {title: string; body: string}> = {
-  buscar: {title: t('screen.searchTitle'), body: t('screen.searchBody')},
+// Las claves, no el texto: se traduce al pintar, que el idioma puede cambiar.
+const COPY: Record<PlaceholderTab, {title: TextKey; body: TextKey}> = {
+  buscar: {title: 'screen.searchTitle', body: 'screen.searchBody'},
 };
 
 export default function PlaceholderScreen({tab}: {tab: PlaceholderTab}) {
   const {title, body} = COPY[tab];
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.body}>{body}</Text>
+      <Text style={styles.title}>{t(title)}</Text>
+      <Text style={styles.body}>{t(body)}</Text>
     </View>
   );
 }

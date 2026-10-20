@@ -247,7 +247,8 @@
     <tr><td><code>skipButtons</code></td><td>Los botones ⟲10 / ⟳10 de la fila central.</td></tr>
     <tr><td><code>doubleTapSkip</code></td><td>El doble tap en los lados para ±10 s. El tap sencillo pasa a actuar al instante, sin esperar al segundo.</td></tr>
     <tr><td><code>trackButtons</code></td><td>Los botones ⏮ / ⏭ (que además necesitan <code>onNext</code>/<code>onPrevious</code>).</td></tr>
-    <tr><td><code>seekBar</code></td><td>La barra arrastrable <em>y</em> la barra fina que queda cuando se ocultan los controles.</td></tr>
+    <tr><td><code>seekBar</code></td><td>La barra de progreso arrastrable.</td></tr>
+    <tr><td><code>idleProgressBar</code></td><td>La barra fina que queda cuando se ocultan los controles. <strong>Apagada por defecto</strong>: se oculta con el resto; <code>features={{idleProgressBar: true}}</code> la deja puesta, como YouTube.</td></tr>
     <tr><td><code>seekPreview</code></td><td>La miniatura al arrastrar (que además necesita <code>storyboard</code>).</td></tr>
     <tr><td><code>holdToSpeed</code></td><td>El x2 al mantener pulsado el vídeo.</td></tr>
     <tr><td><code>subtitlesButton</code></td><td>El botón CC. Las pistas se siguen eligiendo en ⚙.</td></tr>
@@ -276,7 +277,7 @@
 </p>
 <ul>
   <li>La parte reproducida de la barra y su tirador.</li>
-  <li>La barra fina de cuando los controles están ocultos.</li>
+  <li>La barra fina de cuando los controles están ocultos (si se pide con <code>idleProgressBar</code>).</li>
   <li>El botón CC encendido.</li>
   <li>La opción marcada en ⚙ (texto y ✓).</li>
   <li>El badge <strong>EN VIVO</strong> cuando vas pegado al directo.</li>

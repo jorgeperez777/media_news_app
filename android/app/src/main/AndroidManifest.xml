@@ -5,6 +5,9 @@
          react-native-video los publica desde un MediaSessionService propio. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Android 13+: sin este permiso la notificación no llega a verse, y el
+         sistema no avisa de nada. Se pide al abrir el primer vídeo. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
       android:name=".MainApplication"

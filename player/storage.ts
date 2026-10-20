@@ -7,10 +7,13 @@
  * pocos segundos, así que no conviene tocar el disco en cada `onProgress`.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type {DataSaver} from '../components/useNetworkCap';
+import type {DataSaver} from 'react-native-video/controls';
+import type {LanguagePreference} from '../i18n';
 
 const POSITIONS_KEY = 'player.positions.v1';
 const PREFS_KEY = 'player.prefs.v1';
+const FAVOURITES_KEY = 'app.favourites.v1';
+const LANGUAGE_KEY = 'app.language.v1';
 
 /** Por debajo de esto no merece la pena recordar nada. */
 const MIN_RESUME_S = 15;
@@ -53,6 +56,32 @@ async function writeJson(key: string, value: unknown) {
 }
 
 export const loadPositions = () => readJson<Positions>(POSITIONS_KEY, {});
+
+/**
+ * «Mi lista»: los `uri` marcados, del más reciente al más antiguo. Se guarda el
+ * uri y no el índice del catálogo porque el índice cambia en cuanto se añade o
+ * se quita una entrada de `sources.ts`.
+ */
+export const loadFavourites = () => readJson<string[]>(FAVOURITES_KEY, []);
+
+/**
+ * Idioma elegido en Perfil. 'auto' (lo que diga el dispositivo) es lo que vale
+ * mientras no se toque nada.
+ */
+export const loadLanguage = () =>
+  readJson<LanguagePreference>(LANGUAGE_KEY, 'auto');
+export const saveLanguage = (preference: LanguagePreference) =>
+  writeJson(LANGUAGE_KEY, preference);
+
+/** Añade o quita, y devuelve la lista ya guardada. */
+export async function toggleFavourite(uri: string) {
+  const list = await loadFavourites();
+  const next = list.includes(uri)
+    ? list.filter(saved => saved !== uri)
+    : [uri, ...list];
+  await writeJson(FAVOURITES_KEY, next);
+  return next;
+}
 export const loadPrefs = () => readJson<Prefs>(PREFS_KEY, {});
 export const savePrefs = (prefs: Prefs) => writeJson(PREFS_KEY, prefs);
 

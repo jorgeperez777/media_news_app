@@ -14,12 +14,23 @@ const config = {
   // Metro debe observar el directorio de la librería para recoger cambios en src/.
   watchFolders: [playerRoot],
   resolver: {
-    // Evita que la librería resuelva su propia copia de react / react-native
-    // desde ../video_player/node_modules (causaría "Invalid hook call").
-    extraNodeModules: {
-      react: path.resolve(__dirname, 'node_modules/react'),
-      'react-native': path.resolve(__dirname, 'node_modules/react-native'),
-    },
+    /**
+     * Todo lo que la librería pida se busca **aquí**, no en su propio
+     * node_modules. Dos motivos:
+     *
+     * - react y react-native tienen que ser los de la app; con dos copias sale
+     *   «Invalid hook call».
+     * - los controles (`react-native-video/controls`) cargan svg, safe-area,
+     *   orientación, cast y netinfo como dependencias opcionales, y esas solo
+     *   están instaladas en la app.
+     */
+    extraNodeModules: new Proxy(
+      {},
+      {
+        get: (_target, name) =>
+          path.resolve(__dirname, 'node_modules', String(name)),
+      },
+    ),
     blockList: [
       new RegExp(`${playerRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/node_modules/react/.*`),
       new RegExp(`${playerRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/node_modules/react-native/.*`),
