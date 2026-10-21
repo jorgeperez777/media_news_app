@@ -39,7 +39,7 @@ import {
   ShareIcon,
 } from '../components/icons';
 import ExpandableText from '../components/ExpandableText';
-import Poster from '../components/Poster';
+import Poster, {GRID_GAP, posterSize} from '../components/Poster';
 import GradientFill from '../components/GradientFill';
 import {formatLength} from '../components/format';
 import {
@@ -157,7 +157,7 @@ export default function SeriesScreen({
         key: `series-${item.id}`,
         title: item.title,
         subtitle: t('screen.seriesEpisodes', {count: item.episodes.length}),
-        image: undefined as string | undefined,
+        image: item.poster,
         onPress: () => onOpenSeries(item.id),
       })),
     ...movies().map(item => ({
@@ -170,8 +170,10 @@ export default function SeriesScreen({
   ];
 
   const artHeight = Math.round(width * 1.25);
-  // Dos columnas con el mismo margen que las demás rejillas.
-  const cardWidth = Math.floor((width - 16 * 2 - 10) / 2);
+  // La medida compartida: una carátula mide lo mismo aquí que en Inicio o en
+  // «Ver todo» (ver `posterSize`). Antes esta rejilla iba a dos columnas y sus
+  // tarjetas eran casi el doble de anchas que las de al lado.
+  const {width: cardWidth, height: cardHeight} = posterSize(width);
 
   // Cabecera al bajar, como en Inicio: solo mueve opacidades, así que el scroll
   // puede ir por el hilo nativo.
@@ -226,7 +228,14 @@ export default function SeriesScreen({
         )}>
         {/* Portada a sangre con el título encima */}
         <View style={{height: artHeight}}>
-          <Art title={series.title} width={width} height={artHeight} />
+          <Art
+            title={series.title}
+            // Vertical: la portada es más alta que ancha, así que manda el
+            // cartel y el fondo apaisado es el recambio.
+            image={series.poster ?? series.backdrop}
+            width={width}
+            height={artHeight}
+          />
           <View style={styles.artBottom}>
             <Text style={styles.title}>{series.title}</Text>
             <Text style={styles.meta}>
@@ -326,7 +335,7 @@ export default function SeriesScreen({
                   subtitle={item.subtitle}
                   image={item.image}
                   width={cardWidth}
-                  height={Math.round(cardWidth * 1.5)}
+                  height={cardHeight}
                   onPress={item.onPress}
                 />
               ))}
@@ -518,7 +527,14 @@ function EpisodeRow({
       style={({pressed}) => [styles.row, pressed && styles.pressed]}>
       <View style={styles.rowHead}>
         <View style={styles.thumb}>
-          <Art title={episode.title} width={128} height={72} />
+          {/* El fotograma del episodio cuando lo hay (las series de TMDb lo
+              traen); si no, el degradado de siempre. */}
+          <Art
+            title={episode.title}
+            image={episode.poster}
+            width={128}
+            height={72}
+          />
           <View style={styles.thumbPlay}>
             <PlayIcon size={18} />
           </View>
@@ -565,27 +581,50 @@ function EpisodeRow({
 /** Portada dibujada: no hay imágenes en el catálogo (ver `Poster`). */
 function Art({
   title,
+  image,
   width,
   height,
 }: {
   title: string;
+  /** Cartel de la serie, cuando lo hay (las de TMDb lo traen). */
+  image?: string;
   width: number;
   height: number;
 }) {
   const [from, to] = ART[title.length % ART.length];
   // El id tiene que ser único dentro del documento SVG.
   const id = `art-${title.replace(/[^a-z0-9]/gi, '')}-${width}`;
+
+  // Con cartel, el degradado pasa de ser la portada a ser lo que oscurece el
+  // pie: el título va encima y sobre una imagen clara no se leería.
   return (
-    <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2="0.3" y2="1">
-          <Stop offset="0" stopColor={from} />
-          <Stop offset="0.6" stopColor={to} />
-          <Stop offset="1" stopColor="#0f0f0f" />
-        </LinearGradient>
-      </Defs>
-      <Rect width={width} height={height} fill={`url(#${id})`} />
-    </Svg>
+    <>
+      {!!image && (
+        <Image
+          source={{uri: image}}
+          resizeMode="cover"
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+      <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
+        <Defs>
+          <LinearGradient id={id} x1="0" y1="0" x2={image ? '0' : '0.3'} y2="1">
+            <Stop
+              offset="0"
+              stopColor={image ? '#000' : from}
+              stopOpacity={image ? 0 : 1}
+            />
+            <Stop
+              offset="0.6"
+              stopColor={image ? '#000' : to}
+              stopOpacity={image ? 0.35 : 1}
+            />
+            <Stop offset="1" stopColor={image ? '#000' : '#0f0f0f'} />
+          </LinearGradient>
+        </Defs>
+        <Rect width={width} height={height} fill={`url(#${id})`} />
+      </Svg>
+    </>
   );
 }
 
@@ -677,7 +716,7 @@ const styles = StyleSheet.create({
   tabMark: {height: 3, borderRadius: 2, overflow: 'hidden'},
   tabText: {color: '#fff', fontSize: 15, fontWeight: '700'},
   tabTextOff: {color: '#8c8c8c'},
-  grid: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
+  grid: {flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP},
   // El selector es un botón, no una fila de chips: con ocho temporadas los
   // chips se desbordarían.
   seasonButton: {

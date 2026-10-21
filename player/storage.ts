@@ -82,6 +82,9 @@ export async function toggleFavourite(uri: string) {
   await writeJson(FAVOURITES_KEY, next);
   return next;
 }
+/** Vacía «Mi lista» entera (desde Perfil). */
+export const clearFavourites = () => writeJson(FAVOURITES_KEY, []);
+
 export const loadPrefs = () => readJson<Prefs>(PREFS_KEY, {});
 export const savePrefs = (prefs: Prefs) => writeJson(PREFS_KEY, prefs);
 
@@ -123,7 +126,10 @@ export async function savePosition(
   duration: number,
 ) {
   const positions = await loadPositions();
-  await writeJson(POSITIONS_KEY, withPosition(positions, uri, seconds, duration));
+  await writeJson(
+    POSITIONS_KEY,
+    withPosition(positions, uri, seconds, duration),
+  );
 }
 
 /** Posición desde la que arrancar, o 0 si toca empezar de cero. */

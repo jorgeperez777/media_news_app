@@ -54,7 +54,7 @@ const MINI_VIDEO_WIDTH = MINI_HEIGHT * (16 / 9);
  * El paso a miniplayer es **inmediato**: se pulsa el botón y la caja se dibuja ya en
  * la barra de abajo, sin animación de colapso ni gesto de arrastre.
  */
-export default function PlayerHost() {
+function PlayerHost() {
   const player = usePlayer();
   // El vídeo de una película del archivo se resuelve después de abrirla: hay
   // que repintar cuando aparezca su uri.
@@ -421,3 +421,12 @@ const styles = StyleSheet.create({
   miniTitleText: {color: '#fff', fontSize: 12, fontWeight: '600'},
   miniButton: {padding: 8},
 });
+
+/**
+ * Memorizado a propósito: `PlayerHost` cuelga de la raíz, al lado de las
+ * pantallas, así que **cada navegación** lo volvía a renderizar —y con él todo
+ * el árbol de controles del reproductor— aunque el vídeo no se hubiera
+ * enterado de nada. Sin props que le lleguen de fuera, lo único que lo repinta
+ * ahora es lo suyo: el estado del reproductor y el catálogo.
+ */
+export default React.memo(PlayerHost);

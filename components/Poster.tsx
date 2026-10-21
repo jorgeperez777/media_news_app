@@ -1,13 +1,13 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {
   Image,
+  PixelRatio,
   Pressable,
   StyleSheet,
   Text,
   View,
   type ViewStyle,
 } from 'react-native';
-import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import {PlayIcon} from './icons';
 import {SCRIM} from './scrim';
 import {PROGRESS_GRADIENT} from '../theme';
@@ -21,23 +21,77 @@ import {PROGRESS_GRADIENT} from '../theme';
  * la imagen y hace de hueco mientras carga.
  */
 
-/** Parejas de color para los degradados; se elige una según el título. */
-const PALETTE: Array<[string, string]> = [
-  ['#7b2d26', '#1b0f12'],
-  ['#1f3a5f', '#0d1420'],
-  ['#4a2b6b', '#140d1f'],
-  ['#1d4d43', '#0b1a17'],
-  ['#6b3f1d', '#1f1309'],
-  ['#2c2c54', '#101021'],
-];
+/**
+ * El tamaño de una carátula, el mismo en toda la app.
+ *
+ * Manda la rejilla: ahí el ancho no es libre, hay que repartir la pantalla
+ * entre tres columnas, sus huecos y los márgenes. Las filas de Inicio son
+ * carruseles y podrían usar cualquier medida, pero entonces la misma película
+ * cambiaría de tamaño al pasar de Inicio a «Ver todo».
+ */
+export const GRID_COLUMNS = 3;
+/** Margen lateral de las listas y hueco entre tarjetas. */
+export const GRID_GUTTER = 16;
+export const GRID_GAP = 10;
 
-/** Mismo título → mismo color siempre (y sin guardar nada). */
-function colorsFor(seed: string) {
+export function posterSize(windowWidth: number) {
+  const width = Math.floor(
+    (windowWidth - GRID_GUTTER * 2 - GRID_GAP * (GRID_COLUMNS - 1)) /
+      GRID_COLUMNS,
+  );
+  // 2:3, como una carátula de cine.
+  return {width, height: Math.round(width * 1.5)};
+}
+
+/**
+ * Lo mismo para las tarjetas apaisadas («Seguir viendo», «En directo»,
+ * noticias): dos columnas de la rejilla menos un hueco. Siguen atadas a la
+ * misma medida que las carátulas, pero quedan algo más bajas, que es lo que
+ * pide una fila de fotogramas al lado de una de carteles.
+ */
+export function wideSize(windowWidth: number) {
+  const width = posterSize(windowWidth).width * 2 - GRID_GAP;
+  // 16:9, la forma de un fotograma.
+  return {width, height: Math.round((width * 9) / 16)};
+}
+
+/**
+ * Anchos en los que TMDb sirve cada carátula. Pedir siempre el mayor es tirar
+ * datos: en la rejilla la tarjeta mide ~113 dp, que en un móvil de densidad 3
+ * son 339 px, y el `w500` que viene en la ficha pesa casi el doble para nada.
+ */
+const TMDB_WIDTHS = [92, 154, 185, 342, 500, 780];
+
+/** La misma carátula, en el ancho más ajustado a la tarjeta. */
+function sized(uri: string, width: number) {
+  if (!uri.includes('image.tmdb.org/t/p/w')) {
+    return uri;
+  }
+  const pixels = width * PixelRatio.get();
+  const pick = TMDB_WIDTHS.find(option => option >= pixels);
+  return pick ? uri.replace(/\/w\d+\//, `/w${pick}/`) : uri;
+}
+
+/**
+ * Grises para la tarjeta sin carátula.
+ *
+ * Antes eran colores (rojo, azul, morado…) y una rejilla de títulos sin imagen
+ * parecía un muestrario: los colores pedían atención para decir precisamente
+ * que ahí no hay nada que ver. En gris la tarjeta se lee como lo que es, un
+ * hueco, y las que sí tienen cartel destacan solas.
+ *
+ * Siguen siendo cuatro y no uno para que dos tarjetas pegadas no se fundan en
+ * un bloque plano.
+ */
+const GREYS = ['#2a2a2e', '#303036', '#25252a', '#343439'];
+
+/** Mismo título → mismo gris siempre (y sin guardar nada). */
+function greyFor(seed: string) {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = (hash * 31 + seed.charCodeAt(i)) % 100000;
   }
-  return PALETTE[hash % PALETTE.length];
+  return GREYS[hash % GREYS.length];
 }
 
 function Poster({
@@ -70,8 +124,17 @@ function Poster({
   style?: ViewStyle;
   onPress?: () => void;
 }) {
-  const [from, to] = colorsFor(title);
-  const id = `g${Math.abs(title.length * 7 + title.charCodeAt(0))}`;
+  /**
+   * Estado de la carátula: `waiting` mientras viaja, `shown` cuando ha
+   * llegado y `failed` si no llega.
+   *
+   * Hace falta distinguir el fallo: sin él, una imagen rota dejaba la tarjeta
+   * gris para siempre, porque el hueco solo se quitaba al cargar.
+   */
+  const [art, setArt] = useState<'waiting' | 'shown' | 'failed'>('waiting');
+  // Una imagen que no carga no es una tarjeta: se cae al degradado del título.
+  const showImage = !!image && art !== 'failed';
+  const grey = greyFor(title);
 
   return (
     <Pressable
@@ -84,13 +147,22 @@ function Poster({
         style,
         pressed && styles.pressed,
       ]}>
-      {/* Con foto no se dibuja el degradado: son dos SVG por tarjeta y, con
-          sesenta en una rejilla, se nota. Sin foto, el degradado ES la
-          carátula. */}
-      {image ? (
+      {/* Nada de SVG en la tarjeta: en una rejilla de sesenta, montar un SVG
+          por carátula (más otro por el icono) se nota al desplazar. El fondo
+          es un color liso y el oscurecido de abajo, el mismo PNG estirado que
+          ya se usa sobre las fotos (ver `SCRIM`). */}
+      {showImage ? (
         <>
+          {/* Hueco mientras la imagen viaja: gris liso (sin SVG, que son
+              sesenta tarjetas) con el icono tenue. Sin esto, la rejilla se
+              llena de rectángulos negros hasta que llegan las carátulas. */}
+          {art === 'waiting' && (
+            <View pointerEvents="none" style={styles.hole}>
+              <Placeholder size={Math.round(Math.min(width, height) * 0.3)} />
+            </View>
+          )}
           <Image
-            source={{uri: image}}
+            source={{uri: sized(image, width)}}
             style={StyleSheet.absoluteFill}
             resizeMode="cover"
             // En Android, que Fresco la reescale al decodificar: si no, cada
@@ -98,6 +170,8 @@ function Poster({
             resizeMethod="resize"
             // Sin el fundido de entrada: una tarjeta menos que animar.
             fadeDuration={0}
+            onLoad={() => setArt('shown')}
+            onError={() => setArt('failed')}
           />
           {/* Velo para leer el título: un degradado de verdad, pero como
               imagen diminuta estirada (ver `SCRIM`), no como SVG. */}
@@ -110,15 +184,21 @@ function Poster({
           />
         </>
       ) : (
-        <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
-          <Defs>
-            <LinearGradient id={id} x1="0" y1="0" x2="0.4" y2="1">
-              <Stop offset="0" stopColor={from} />
-              <Stop offset="1" stopColor={to} />
-            </LinearGradient>
-          </Defs>
-          <Rect width={width} height={height} fill={`url(#${id})`} />
-        </Svg>
+        <>
+          <View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, {backgroundColor: grey}]}
+          />
+          <Image
+            pointerEvents="none"
+            source={{uri: SCRIM}}
+            style={StyleSheet.absoluteFill}
+            resizeMode="stretch"
+            fadeDuration={0}
+          />
+          {/* Sin carátula sigue haciendo falta decir que esto es un vídeo. */}
+          <Placeholder size={Math.round(Math.min(width, height) * 0.3)} />
+        </>
       )}
 
       {play ? (
@@ -166,6 +246,33 @@ function Poster({
  */
 export default React.memo(Poster);
 
+/**
+ * El icono tenue del hueco: ni tapa el título ni compite con la carátula.
+ *
+ * Dibujado con vistas (un marco y un triángulo de bordes) en vez de con un
+ * icono SVG: esto se monta una vez por tarjeta y en una rejilla larga el SVG
+ * salía caro.
+ */
+function Placeholder({size}: {size: number}) {
+  return (
+    <View pointerEvents="none" style={styles.placeholder}>
+      <View
+        style={[styles.glyph, {width: size, height: Math.round(size * 0.72)}]}>
+        <View
+          style={[
+            styles.glyphPlay,
+            {
+              borderLeftWidth: Math.round(size * 0.24),
+              borderTopWidth: Math.round(size * 0.15),
+              borderBottomWidth: Math.round(size * 0.15),
+            },
+          ]}
+        />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
@@ -195,6 +302,39 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.85)',
     backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hole: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#2b2b30',
+  },
+  glyph: {
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  glyphPlay: {
+    width: 0,
+    height: 0,
+    marginLeft: 3,
+    borderStyle: 'solid',
+    borderLeftColor: 'rgba(255,255,255,0.18)',
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  placeholder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -81,9 +81,20 @@ App.tsx ─ PlayerProvider (player/PlayerContext.tsx)
 ```
 
 **Inicio** es el catálogo entero: destacados en carrusel y, debajo, Seguir viendo,
-Películas, Series y En directo. «Ver todo» abre esa categoría en su propia pantalla
-(`screens/CategoryScreen.tsx`, una rejilla con todo). La pestaña es una pila: Inicio →
-categoría → ficha de serie o de película, y atrás deshace un nivel cada vez.
+Películas, Series, una fila por género y En directo. «Ver todo» abre esa fila en su
+propia pantalla (`screens/CategoryScreen.tsx`, una rejilla con todo). La pestaña es una
+pila: Inicio → categoría → ficha de serie o de película, y atrás deshace un nivel cada
+vez.
+
+Las filas **se cortan a 20 títulos** y, cuando hay más, la última tarjeta es un «Ver
+todo» que lleva a la rejilla. Es lo que hacen Netflix y compañía, y por dos razones: una
+fila es un aperitivo —nadie desliza doscientas carátulas de lado—, y la tarjeta cae
+donde acaba el dedo, que es justo cuando estás pidiendo ver más. El enlace de la
+cabecera se queda igualmente, para quien no llega al final.
+
+Un **género** no es una lista aparte: es un filtro sobre las películas, así que
+`Category` admite `{genre}` además de las tres secciones fijas, y la rejilla filtra por
+ahí. El «cargar más» del archivo también vale dentro de un género.
 
 La pila es de verdad: lo de encima **se pone encima**, no sustituye a lo de abajo. Inicio
 sigue montado mientras miras una ficha, así que al volver la portada está por donde la

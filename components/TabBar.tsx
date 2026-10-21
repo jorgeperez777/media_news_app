@@ -1,7 +1,13 @@
 import React, {useEffect, useRef} from 'react';
 import {Animated, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {FavoriteIcon, GRADIENT, HomeIcon, NewsIcon, PersonIcon} from './icons';
+import {
+  FavoriteIcon,
+  GRADIENT,
+  HomeIcon,
+  LiveTvIcon,
+  PersonIcon,
+} from './icons';
 import {t, useLanguage, type TextKey} from '../i18n';
 import {useReduceMotion} from './motion';
 import {ACCENT} from '../theme';
@@ -27,14 +33,22 @@ export function useTabBarSpace() {
   return BAR_HEIGHT + insets.bottom;
 }
 
-export type TabKey = 'inicio' | 'noticias' | 'buscar' | 'favoritos' | 'perfil';
+export type TabKey =
+  | 'inicio'
+  | 'envivo'
+  | 'noticias'
+  | 'buscar'
+  | 'favoritos'
+  | 'perfil';
 
 /**
  * Lo que se ve en la barra. La etiqueta se traduce al pintar, no aquí: el idioma
  * se puede cambiar.
  *
- * Buscar está escondida a propósito: la pantalla sigue ahí (`PlaceholderScreen`)
- * y `TabKey` la admite, pero no se ofrece hasta que tenga buscador de verdad.
+ * Buscar y Noticias están escondidas a propósito: sus pantallas siguen ahí y
+ * `TabKey` las admite, pero no se ofrecen. Buscar, hasta que tenga buscador de
+ * verdad; Noticias, hasta que las noticias no sean de prueba. A Noticias se
+ * llega igualmente desde una noticia guardada en Favoritos.
  */
 const TABS: Array<{
   key: TabKey;
@@ -42,7 +56,7 @@ const TABS: Array<{
   Icon: (props: {size?: number; color?: string}) => React.JSX.Element;
 }> = [
   {key: 'inicio', label: 'tab.home', Icon: HomeIcon},
-  {key: 'noticias', label: 'tab.news', Icon: NewsIcon},
+  {key: 'envivo', label: 'tab.live', Icon: LiveTvIcon},
   {key: 'favoritos', label: 'tab.favourites', Icon: FavoriteIcon},
   {key: 'perfil', label: 'tab.profile', Icon: PersonIcon},
 ];

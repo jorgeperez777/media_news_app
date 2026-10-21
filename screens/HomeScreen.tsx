@@ -25,9 +25,14 @@ import {usePlayer} from '../player/PlayerContext';
 import {t} from '../i18n';
 import {useTabBarSpace} from '../components/TabBar';
 import {MINI_HEIGHT} from '../components/PlayerHost';
-import Poster from '../components/Poster';
+import Poster, {posterSize, wideSize} from '../components/Poster';
 import GradientFill from '../components/GradientFill';
-import {CloseIcon, PlayIcon, SearchIcon} from '../components/icons';
+import {
+  ArrowBackIcon,
+  CloseIcon,
+  PlayIcon,
+  SearchIcon,
+} from '../components/icons';
 import {loadPositions, resumeFrom, type Positions} from '../player/storage';
 import {formatLength} from '../components/format';
 import Skeleton, {SkeletonRow} from '../components/Skeleton';
@@ -41,6 +46,14 @@ const HERO_AUTOPLAY_MS = 5000;
  * fila, es una tarjeta suelta.
  */
 const GENRE_MIN = 2;
+/**
+ * Cuántos títulos entran en una fila antes de la tarjeta de «Ver todo».
+ *
+ * Una fila es un aperitivo, no el catálogo: con el género bien lleno puede
+ * haber doscientos, y deslizar doscientas carátulas de lado no lo hace nadie.
+ * El resto está a un toque, en la rejilla, que es donde se busca de verdad.
+ */
+const ROW_MAX = 20;
 /** Más destacados que esto y los puntos se cambian por «3 / 42». */
 const DOTS_MAX = 8;
 /**
@@ -51,8 +64,6 @@ const DOTS_MAX = 8;
 const HERO_MAX = 8;
 const HEADER_HEIGHT = 52;
 const HEADER_FADE = 140;
-const POSTER_WIDTH = 124;
-const POSTER_HEIGHT = 186; // 2:3, como una carátula de cine
 /** Colores de los degradados de los destacados. */
 const HERO_COLORS: Array<[string, string]> = [
   ['#8a3b12', '#3a1709'],
@@ -60,8 +71,6 @@ const HERO_COLORS: Array<[string, string]> = [
   ['#4a2b6b', '#1f1430'],
   ['#1d4d43', '#0f2420'],
 ];
-const WIDE_WIDTH = 220;
-const WIDE_HEIGHT = 124;
 
 /**
  * Portada de la app: cabecera flotante sobre un destacado a toda pantalla y,
@@ -88,6 +97,10 @@ export default function HomeScreen({
   const insets = useSafeAreaInsets();
   const tabBarSpace = useTabBarSpace();
   const {width} = useWindowDimensions();
+  // Las carátulas miden lo mismo aquí que en la rejilla de «Ver todo»: una
+  // película no debe cambiar de tamaño al pasar de una vista a la otra.
+  const {width: posterWidth, height: posterHeight} = posterSize(width);
+  const {width: wideWidth, height: wideHeight} = wideSize(width);
   const [positions, setPositions] = useState<Positions>({});
   // Mientras se lee lo guardado se enseña el esqueleto: si no, la portada
   // aparece sin las barras de «seguir viendo» y se recoloca al llegar.
@@ -164,6 +177,8 @@ export default function HomeScreen({
         key: series.id,
         title: series.title,
         meta: t('screen.seriesEpisodes', {count: series.episodes.length}),
+        // En grande manda el fondo apaisado, igual que con las películas.
+        image: series.backdrop ?? series.poster,
         onPlay: () =>
           next && player.open(next.index, {presentation: 'immersive'}),
         onDetails: () => onOpenSeries(series.id),
@@ -230,18 +245,25 @@ export default function HomeScreen({
       key: 'movies',
       render: () => (
         <Row title={t('screen.moviesRow')} onSeeAll={() => onSeeAll('movies')}>
-          {movieList.map(item => (
+          {movieList.slice(0, ROW_MAX).map(item => (
             <Poster
               key={item.index}
               title={item.title}
               subtitle={item.label}
               image={item.poster}
-              width={POSTER_WIDTH}
-              height={POSTER_HEIGHT}
+              width={posterWidth}
+              height={posterHeight}
               progress={progressOf(item.source.uri)}
               onPress={() => onOpenMovie(item.index)}
             />
           ))}
+          {movieList.length > ROW_MAX && (
+            <SeeAllCard
+              width={posterWidth}
+              height={posterHeight}
+              onPress={() => onSeeAll('movies')}
+            />
+          )}
         </Row>
       ),
     },
@@ -250,19 +272,26 @@ export default function HomeScreen({
     ...genreRows.map(([genre, items]) => ({
       key: `genre-${genre}`,
       render: () => (
-        <Row title={genre}>
-          {items.map(item => (
+        <Row title={genre} onSeeAll={() => onSeeAll({genre})}>
+          {items.slice(0, ROW_MAX).map(item => (
             <Poster
               key={item.index}
               title={item.title}
               subtitle={item.label}
               image={item.poster}
-              width={POSTER_WIDTH}
-              height={POSTER_HEIGHT}
+              width={posterWidth}
+              height={posterHeight}
               progress={progressOf(item.source.uri)}
               onPress={() => onOpenMovie(item.index)}
             />
           ))}
+          {items.length > ROW_MAX && (
+            <SeeAllCard
+              width={posterWidth}
+              height={posterHeight}
+              onPress={() => onSeeAll({genre})}
+            />
+          )}
         </Row>
       ),
     })),
@@ -272,18 +301,26 @@ export default function HomeScreen({
         <Row
           title={t('screen.seriesTitle')}
           onSeeAll={() => onSeeAll('series')}>
-          {seriesList.map(series => (
+          {seriesList.slice(0, ROW_MAX).map(series => (
             <Poster
               key={series.id}
               title={series.title}
               subtitle={t('screen.seriesEpisodes', {
                 count: series.episodes.length,
               })}
-              width={POSTER_WIDTH}
-              height={POSTER_HEIGHT}
+              image={series.poster}
+              width={posterWidth}
+              height={posterHeight}
               onPress={() => onOpenSeries(series.id)}
             />
           ))}
+          {seriesList.length > ROW_MAX && (
+            <SeeAllCard
+              width={posterWidth}
+              height={posterHeight}
+              onPress={() => onSeeAll('series')}
+            />
+          )}
         </Row>
       ),
     },
@@ -291,19 +328,26 @@ export default function HomeScreen({
       key: 'live',
       render: () => (
         <Row title={t('screen.liveRow')} onSeeAll={() => onSeeAll('live')}>
-          {channels.map(channel => (
+          {channels.slice(0, ROW_MAX).map(channel => (
             <Poster
               key={channel.index}
               title={channel.title}
               subtitle={channel.label}
               badge={t('live.badge')}
-              width={WIDE_WIDTH}
-              height={WIDE_HEIGHT}
+              width={wideWidth}
+              height={wideHeight}
               onPress={() =>
                 player.open(channel.index, {presentation: 'immersive'})
               }
             />
           ))}
+          {channels.length > ROW_MAX && (
+            <SeeAllCard
+              width={wideWidth}
+              height={wideHeight}
+              onPress={() => onSeeAll('live')}
+            />
+          )}
         </Row>
       ),
     },
@@ -361,13 +405,16 @@ export default function HomeScreen({
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{paddingBottom: bottomSpace}}>
-          {term !== '' && found === 0 && (
+          {/* Con el catálogo todavía llegando, «no hay nada» sería mentira:
+              puede estar a punto de entrar. Se enseñan huecos hasta que acabe
+              de cargarse. */}
+          {term !== '' && found === 0 && !catalog.loading && (
             <Text style={styles.noResults}>
               {t('screen.noResults', {query: term})}
             </Text>
           )}
 
-          {foundMovies.length > 0 && (
+          {(foundMovies.length > 0 || catalog.loading) && (
             <Row title={t('screen.moviesRow')}>
               {foundMovies.map(item => (
                 <Poster
@@ -375,12 +422,22 @@ export default function HomeScreen({
                   title={item.title}
                   subtitle={item.label}
                   image={item.poster}
-                  width={POSTER_WIDTH}
-                  height={POSTER_HEIGHT}
+                  width={posterWidth}
+                  height={posterHeight}
                   progress={progressOf(item.source.uri)}
                   onPress={() => onOpenMovie(item.index)}
                 />
               ))}
+              {/* El catálogo sigue llegando: al final de lo encontrado van los
+                  huecos de lo que puede entrar todavía. */}
+              {catalog.loading && (
+                <SkeletonRow
+                  count={3}
+                  width={posterWidth}
+                  height={posterHeight}
+                  radius={12}
+                />
+              )}
             </Row>
           )}
 
@@ -393,8 +450,9 @@ export default function HomeScreen({
                   subtitle={t('screen.seriesEpisodes', {
                     count: series.episodes.length,
                   })}
-                  width={POSTER_WIDTH}
-                  height={POSTER_HEIGHT}
+                  image={series.poster}
+                  width={posterWidth}
+                  height={posterHeight}
                   onPress={() => onOpenSeries(series.id)}
                 />
               ))}
@@ -409,8 +467,8 @@ export default function HomeScreen({
                   title={channel.title}
                   subtitle={channel.label}
                   badge={t('live.badge')}
-                  width={WIDE_WIDTH}
-                  height={WIDE_HEIGHT}
+                  width={wideWidth}
+                  height={wideHeight}
                   onPress={() =>
                     player.open(channel.index, {presentation: 'immersive'})
                   }
@@ -520,8 +578,8 @@ export default function HomeScreen({
                     // ancho sale por la mitad. Manda el fondo.
                     image={item.backdrop ?? item.poster}
                     play
-                    width={WIDE_WIDTH}
-                    height={WIDE_HEIGHT}
+                    width={wideWidth}
+                    height={wideHeight}
                     progress={progressOf(item.source.uri)}
                     // Seguir viendo reproduce directamente, en horizontal.
                     onPress={() =>
@@ -626,18 +684,11 @@ function Hero({
   const [from, mid] =
     HERO_COLORS[Math.abs(item.title.length) % HERO_COLORS.length];
   return (
-    <View style={[styles.hero, {width, height}]}>
-      <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
-        <Defs>
-          <LinearGradient id={id} x1="0" y1="0" x2="0.3" y2="1">
-            <Stop offset="0" stopColor={from} />
-            <Stop offset="0.55" stopColor={mid} />
-            <Stop offset="1" stopColor="#0f0f0f" />
-          </LinearGradient>
-        </Defs>
-        <Rect width={width} height={height} fill={`url(#${id})`} />
-      </Svg>
-
+    // El color de base va en la vista: con foto, el degradado quedaba debajo
+    // de la imagen sin verse, y eran ocho destacados montados a la vez, cada
+    // uno con dos SVG a pantalla completa. Ahora el degradado solo se dibuja
+    // cuando es lo que se ve.
+    <View style={[styles.hero, {width, height, backgroundColor: from}]}>
       {item.image ? (
         <>
           <Image
@@ -664,7 +715,18 @@ function Hero({
             <Rect width={width} height={height} fill={`url(#${id}-veil)`} />
           </Svg>
         </>
-      ) : null}
+      ) : (
+        <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
+          <Defs>
+            <LinearGradient id={id} x1="0" y1="0" x2="0.3" y2="1">
+              <Stop offset="0" stopColor={from} />
+              <Stop offset="0.55" stopColor={mid} />
+              <Stop offset="1" stopColor="#0f0f0f" />
+            </LinearGradient>
+          </Defs>
+          <Rect width={width} height={height} fill={`url(#${id})`} />
+        </Svg>
+      )}
 
       <View style={styles.heroBottom}>
         <Text style={styles.heroTitle}>{item.title}</Text>
@@ -702,6 +764,9 @@ function HomeSkeleton({
   heroHeight: number;
   insetTop: number;
 }) {
+  const {width} = useWindowDimensions();
+  const poster = posterSize(width);
+  const wide = wideSize(width);
   return (
     <View style={[styles.container, {paddingTop: insetTop}]}>
       <Skeleton width="100%" height={heroHeight - insetTop} radius={0} />
@@ -717,8 +782,8 @@ function HomeSkeleton({
           </View>
           <SkeletonRow
             count={4}
-            width={row === 0 ? WIDE_WIDTH : POSTER_WIDTH}
-            height={row === 0 ? WIDE_HEIGHT : POSTER_HEIGHT}
+            width={row === 0 ? wide.width : poster.width}
+            height={row === 0 ? wide.height : poster.height}
             radius={12}
             style={styles.rowItems}
           />
@@ -729,6 +794,43 @@ function HomeSkeleton({
 }
 
 /** Carrusel horizontal con su título y, si se pasa, el enlace «Ver todo». */
+/**
+ * Última tarjeta de una fila cortada: lleva a la rejilla con todo.
+ *
+ * Va **dentro** de la fila, no solo en la cabecera, porque es donde acaba el
+ * dedo al deslizar: quien llega al final ya está pidiendo ver más.
+ */
+function SeeAllCard({
+  width,
+  height,
+  onPress,
+}: {
+  width: number;
+  height: number;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('screen.seeAll')}
+      onPress={onPress}
+      style={({pressed}) => [
+        styles.seeAllCard,
+        {width, height},
+        pressed && styles.pressed,
+      ]}>
+      <View style={styles.seeAllCircle}>
+        {/* No hay flecha a la derecha en el juego de iconos: es la de volver,
+            del revés. */}
+        <View style={styles.flipHorizontal}>
+          <ArrowBackIcon size={20} />
+        </View>
+      </View>
+      <Text style={styles.seeAllCardText}>{t('screen.seeAll')}</Text>
+    </Pressable>
+  );
+}
+
 function Row({
   title,
   onSeeAll,
@@ -772,6 +874,25 @@ function Row({
 
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#0f0f0f'},
+  seeAllCard: {
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#1a1a1d',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  seeAllCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  seeAllCardText: {color: '#fff', fontSize: 13, fontWeight: '700'},
+  flipHorizontal: {transform: [{scaleX: -1}]},
   header: {
     position: 'absolute',
     top: 0,

@@ -307,3 +307,192 @@ export async function fetchCatalogPage(page = 1): Promise<TmdbTitle[]> {
       rating: movie.vote_average,
     }));
 }
+
+/* --------------------------------------------------------------------------
+ * Series
+ * ------------------------------------------------------------------------ */
+
+/**
+ * TMDb tiene las series en una rama aparte de las películas: `/tv/popular`
+ * para el listado, `/tv/{id}/season/{n}` para los episodios de una temporada.
+ * Los géneros también van por su lista (`/genre/tv/list`): los de televisión no
+ * son los del cine.
+ *
+ * Igual que con las películas, aquí no hay vídeo: TMDb sirve la ficha y quien
+ * llame le pone la película (ver `loadTmdbSeries`, que les pone los vídeos de
+ * muestra).
+ */
+
+export type TmdbEpisode = {
+  season: number;
+  number: number;
+  title: string;
+  overview?: string;
+  /** Fotograma apaisado del episodio, que es lo que TMDb da por episodio. */
+  still?: string;
+  /** Minutos. */
+  runtime?: number;
+  year?: number;
+};
+
+export type TmdbSeries = {
+  tmdbId: number;
+  title: string;
+  overview?: string;
+  poster?: string;
+  backdrop?: string;
+  year?: number;
+  genres: string[];
+  rating?: number;
+  episodes: TmdbEpisode[];
+};
+
+type CachedSeries = {at: number; series: TmdbSeries | null};
+
+/** id de género de televisión → nombre traducido; una vez por idioma. */
+const tvGenreNames = new Map<string, Map<number, string>>();
+
+async function tvGenres() {
+  const language = locale();
+  const known = tvGenreNames.get(language);
+  if (known) {
+    return known;
+  }
+  const body = await get('/genre/tv/list', {language});
+  const list = (body.genres ?? []) as Array<{id: number; name: string}>;
+  const map = new Map(list.map(genre => [genre.id, genre.name]));
+  tvGenreNames.set(language, map);
+  return map;
+}
+
+type TvResult = {
+  id: number;
+  name?: string;
+  overview?: string;
+  poster_path?: string | null;
+  backdrop_path?: string | null;
+  first_air_date?: string;
+  genre_ids?: number[];
+  vote_average?: number;
+};
+
+type SeasonEpisode = {
+  episode_number?: number;
+  season_number?: number;
+  name?: string;
+  overview?: string;
+  still_path?: string | null;
+  runtime?: number;
+  air_date?: string;
+};
+
+/**
+ * Cuántos episodios se cogen de una temporada.
+ *
+ * Medido: sin tope, veinte series populares daban 4.374 episodios y diez
+ * megas en una sola fila del almacén, porque una temporada de una serie diaria
+ * trae cientos. Con veinte por serie hay de sobra para ver cómo queda la ficha
+ * y la lista.
+ */
+const MAX_EPISODES = 20;
+
+/** Los episodios de una temporada, en orden. */
+async function fetchSeason(id: number, season: number) {
+  const body = await get(`/tv/${id}/season/${season}`, {language: locale()});
+  const episodes = (body.episodes ?? []) as SeasonEpisode[];
+  return episodes
+    .filter(episode => episode.episode_number)
+    .slice(0, MAX_EPISODES)
+    .map<TmdbEpisode>(episode => ({
+      season: episode.season_number ?? season,
+      number: episode.episode_number as number,
+      title: episode.name?.trim() || `Episodio ${episode.episode_number}`,
+      overview: episode.overview?.trim() || undefined,
+      // w300: va en una carátula apaisada, no a pantalla completa.
+      still: episode.still_path
+        ? `${IMAGES}/w300${episode.still_path}`
+        : undefined,
+      runtime: Number(episode.runtime) || undefined,
+      year: episode.air_date ? Number(episode.air_date.slice(0, 4)) : undefined,
+    }));
+}
+
+/**
+ * Una serie con los episodios de su primera temporada. Guardada un mes, como
+ * las fichas de cine: son dos peticiones por serie y no cambian a diario.
+ */
+async function fetchSeries(
+  show: TvResult,
+  names: Map<number, string>,
+): Promise<TmdbSeries | null> {
+  const key = `${CACHE_PREFIX}tv|${locale()}|${show.id}`;
+  try {
+    const saved = await AsyncStorage.getItem(key);
+    if (saved) {
+      const cached = JSON.parse(saved) as CachedSeries;
+      if (Date.now() - cached.at < MAX_AGE) {
+        return cached.series;
+      }
+    }
+  } catch {
+    // Sin caché se pide y punto.
+  }
+
+  let series: TmdbSeries | null = null;
+  try {
+    const episodes = await fetchSeason(show.id, 1);
+    if (episodes.length > 0) {
+      series = {
+        tmdbId: show.id,
+        title: show.name as string,
+        overview: show.overview?.trim() || undefined,
+        poster: show.poster_path
+          ? `${IMAGES}/w342${show.poster_path}`
+          : undefined,
+        backdrop: show.backdrop_path
+          ? `${IMAGES}/w780${show.backdrop_path}`
+          : undefined,
+        year: show.first_air_date
+          ? Number(show.first_air_date.slice(0, 4))
+          : undefined,
+        genres: (show.genre_ids ?? [])
+          .map(id => names.get(id))
+          .filter((name): name is string => !!name),
+        rating: show.vote_average,
+        episodes,
+      };
+    }
+  } catch {
+    // Una serie que no se puede traer no tumba la página entera.
+    return null;
+  }
+
+  await AsyncStorage.setItem(
+    key,
+    JSON.stringify({at: Date.now(), series} satisfies CachedSeries),
+  ).catch(() => {});
+  return series;
+}
+
+/**
+ * Una página de series populares (20), ya con los episodios de la primera
+ * temporada. Las series van de cuatro en cuatro para no soltarle a TMDb veinte
+ * peticiones de golpe.
+ */
+export async function fetchSeriesPage(page = 1): Promise<TmdbSeries[]> {
+  if (!TMDB_KEY) {
+    return [];
+  }
+  const names = await tvGenres();
+  const body = await get('/tv/popular', {language: locale(), page});
+  const shows = ((body.results ?? []) as TvResult[]).filter(show => show.name);
+
+  const found: TmdbSeries[] = [];
+  for (let from = 0; from < shows.length; from += 4) {
+    const batch = await Promise.all(
+      shows.slice(from, from + 4).map(show => fetchSeries(show, names)),
+    );
+    batch.forEach(series => series && found.push(series));
+  }
+  return found;
+}

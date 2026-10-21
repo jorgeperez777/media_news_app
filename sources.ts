@@ -11,8 +11,9 @@
  * índice de un título sigue valiendo (es lo que mueve el reproductor).
  */
 import {useSyncExternalStore} from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {fetchMovies, fetchStream} from './api/archive';
-import {fetchCatalogPage, fetchFacts} from './api/tmdb';
+import {fetchCatalogPage, fetchFacts, fetchSeriesPage} from './api/tmdb';
 import type {Chapter, StoryboardSource} from 'react-native-video/controls';
 
 export type Source = {
@@ -44,7 +45,14 @@ export type Source = {
   /** Tramos con nombre: muescas en la barra y «Saltar intro» en los saltables. */
   chapters?: Chapter[];
   /** Serie a la que pertenece. Solo en los `episode`. */
-  series?: {id: string; title: string; description: string};
+  series?: {
+    id: string;
+    title: string;
+    description: string;
+    /** Cartel de la serie: es lo que se ve en las tarjetas de «Series». */
+    poster?: string;
+    backdrop?: string;
+  };
   /** Temporada y número dentro de la serie. */
   episode?: {season: number; number: number};
   /** Carátula de verdad, cuando el título viene de archive.org. */
@@ -79,6 +87,8 @@ const SOURCES: Source[] = [
     kind: 'live',
     label: 'CANAL 1',
     title: 'Red Bull TV',
+    // La categoría del canal: de aquí salen las pestañas de la guía.
+    genres: ['Deportes'],
     description:
       'Canal lineal 24/7 (HLS multi-calidad). Emite siempre en directo, sin ventana DVR.',
     source: {
@@ -90,6 +100,8 @@ const SOURCES: Source[] = [
     kind: 'live',
     label: 'CANAL 2',
     title: 'Unified Streaming — directo con DVR (~10 min)',
+    // La categoría del canal: de aquí salen las pestañas de la guía.
+    genres: ['Pruebas'],
     description:
       'Directo con ventana DVR: badge EN VIVO, barra sobre la ventana y botón para volver al directo.',
     source: {
@@ -105,6 +117,8 @@ const SOURCES: Source[] = [
     kind: 'live',
     label: 'CANAL 3',
     title: 'tagesschau (ARD)',
+    // La categoría del canal: de aquí salen las pestañas de la guía.
+    genres: ['Noticias'],
     description:
       'Canal de noticias 24/7, útil para ver el cambio de calidad en directo.',
     source: {
@@ -120,6 +134,8 @@ const SOURCES: Source[] = [
     kind: 'live',
     label: 'CANAL 4',
     title: 'Akamai — señal de pruebas',
+    // La categoría del canal: de aquí salen las pestañas de la guía.
+    genres: ['Pruebas'],
     description:
       'Señal de pruebas en directo, estable: útil para dejarla sonando en el miniplayer.',
     source: {
@@ -673,6 +689,8 @@ export type Series = {
   id: string;
   title: string;
   description: string;
+  poster?: string;
+  backdrop?: string;
   episodes: IndexedSource[];
 };
 
@@ -737,22 +755,139 @@ export function useCatalog() {
 }
 
 /** Estado de la carga del catálogo remoto, para poder enseñarlo. */
-export type CatalogState = {loading: boolean; error: string | null};
-let state: CatalogState = {loading: false, error: null};
+export type CatalogState = {
+  loading: boolean;
+  error: string | null;
+  /**
+   * El archivo ya no da más: la última página no trajo ni un título nuevo.
+   * Con esto puesto no se vuelve a pedir, ni sola ni a mano y desde ninguna
+   * lista, porque la siguiente página tampoco traería nada.
+   */
+  done: boolean;
+};
+let state: CatalogState = {loading: false, error: null, done: false};
 export const catalogState = () => state;
 
 /** Última página del archivo que se ha traído; 0 = ninguna todavía. */
 let page = 0;
+
+/* --------------------------------------------------------------------------
+ * El listado, guardado en disco
+ * ------------------------------------------------------------------------ */
+
+/**
+ * Las películas del archivo se guardan tal cual quedan —con el cartel y los
+ * géneros que les puso TMDb— y al arrancar se pintan **antes** de pedir nada.
+ *
+ * Es como lo hacen las apps de cine: la pantalla lee de disco y la red solo
+ * escribe ahí, así el arranque en frío no depende de que archive.org conteste
+ * (que últimamente tarda, cuando contesta). Lo que se guarda es texto y pesa
+ * nada; de los carteles ya se encarga la caché de imágenes del sistema.
+ *
+ * No entra el catálogo de ejemplo —vive en el código— ni el de pruebas de
+ * TMDb, que es de usar y tirar (ver `loadTmdbCatalog`).
+ */
+const CATALOG_KEY = 'catalog.archive.v1';
+/** Pasado este tiempo lo guardado se tira y se vuelve a pedir de la red. */
+const CATALOG_MAX_AGE = 7 * 24 * 3600 * 1000;
+/** Tope de títulos guardados: suficiente para varias páginas sin engordar. */
+const CATALOG_MAX = 400;
+
+type CachedCatalog = {at: number; page: number; movies: Source[]};
+
+/** Lo guardado, o `null` si no hay, está caducado o no se entiende. */
+async function readCatalogCache(): Promise<CachedCatalog | null> {
+  try {
+    const raw = await AsyncStorage.getItem(CATALOG_KEY);
+    if (!raw) {
+      return null;
+    }
+    const cached = JSON.parse(raw) as CachedCatalog;
+    if (
+      !Array.isArray(cached.movies) ||
+      Date.now() - cached.at > CATALOG_MAX_AGE
+    ) {
+      return null;
+    }
+    return cached;
+  } catch {
+    // Un almacén corrupto es como no tener nada: se pide a la red.
+    return null;
+  }
+}
+
+/**
+ * Baja a disco las películas del archivo que hay ahora. Se llama al traer una
+ * página y otra vez cuando TMDb acaba de ponerles cara, que es cuando lo
+ * guardado de verdad vale para el siguiente arranque.
+ */
+async function saveCatalogCache() {
+  const saved = SOURCES.filter(item => item.archiveId).slice(0, CATALOG_MAX);
+  if (saved.length === 0) {
+    return;
+  }
+  try {
+    await AsyncStorage.setItem(
+      CATALOG_KEY,
+      JSON.stringify({
+        at: Date.now(),
+        page,
+        movies: saved,
+      } satisfies CachedCatalog),
+    );
+  } catch {
+    // Sin sitio en disco no pasa nada: la próxima vez se pide a la red.
+  }
+}
+
+/** Tira lo guardado (desde Diagnóstico). El catálogo en memoria no se toca. */
+export const clearCatalogCache = () =>
+  AsyncStorage.removeItem(CATALOG_KEY).catch(() => {});
+
+/** Cuántos títulos del archivo hay en el catálogo: los que se guardan. */
+export const archiveCount = () =>
+  SOURCES.reduce((total, item) => total + (item.archiveId ? 1 : 0), 0);
+
+let hydrated = false;
+
+/**
+ * Mete en el catálogo lo guardado la última vez.
+ *
+ * Hay que llamarla **antes** de `loadMovies` (lo hace `App`): si lo guardado
+ * sirve, `page` ya viene puesta y `loadMovies` se da media vuelta sin tocar la
+ * red. El listado se refresca cuando caduca, no en cada arranque: un buscador
+ * del archivo cambia poco y la red es lo caro.
+ */
+export async function hydrateCatalog() {
+  if (hydrated) {
+    return;
+  }
+  hydrated = true;
+  const cached = await readCatalogCache();
+  if (!cached) {
+    return;
+  }
+  const known = new Set(SOURCES.map(item => item.archiveId));
+  const fresh = cached.movies.filter(
+    movie => movie.archiveId && !known.has(movie.archiveId),
+  );
+  if (fresh.length === 0) {
+    return;
+  }
+  SOURCES.push(...fresh);
+  page = Math.max(page, cached.page);
+  changed();
+}
 
 /**
  * Trae las películas de archive.org y las añade al final del catálogo. Si falla
  * (sin red, por ejemplo) se queda el catálogo de ejemplo y se guarda el error.
  */
 export async function loadMovies(next = page === 0 ? 1 : page) {
-  if (state.loading || next <= page) {
+  if (state.loading || state.done || next <= page) {
     return;
   }
-  state = {loading: true, error: null};
+  state = {loading: true, error: null, done: false};
   changed();
   try {
     const found = await fetchMovies(60, next);
@@ -766,7 +901,10 @@ export async function loadMovies(next = page === 0 ? 1 : page) {
         title: movie.title,
         description:
           movie.description || 'Sin sinopsis en el Internet Archive.',
-        poster: movie.poster,
+        // Sin la miniatura del archivo a propósito: responde con un 302 hacia
+        // su CDN y tarda segundos, así que en una rejilla de nueve tarjetas
+        // deja la pantalla entera en gris. Hasta que TMDb trae el cartel
+        // oficial manda el degradado del título, que se pinta al instante.
         year: movie.year,
         archiveId: movie.id,
         // El vídeo se pide al abrirla; hasta entonces no hay uri.
@@ -776,19 +914,25 @@ export async function loadMovies(next = page === 0 ? 1 : page) {
             title: movie.title,
             subtitle: movie.year ? String(movie.year) : undefined,
             artist: 'Internet Archive',
-            // La notificación sin carátula sale con un hueco gris; esta es la
-            // del propio archivo, y TMDb la cambia luego por el cartel.
-            imageUri: movie.poster,
+            // La carátula de la notificación llega con la ficha de TMDb (ver
+            // `enrichCatalog`); hasta entonces, sin imagen.
           },
         },
       }));
     SOURCES.push(...fresh);
     page = next;
-    state = {loading: false, error: null};
+    // Página sin nada nuevo: o se acabó el archivo o venían todos repetidos.
+    // Las dos cosas significan lo mismo para quien pide: no hay más.
+    state = {loading: false, error: null, done: fresh.length === 0};
     // Las fichas de TMDb van por detrás: la lista ya se puede pintar.
+    saveCatalogCache();
     enrichCatalog();
   } catch (error) {
-    state = {loading: false, error: String((error as Error).message ?? error)};
+    state = {
+      loading: false,
+      error: String((error as Error).message ?? error),
+      done: false,
+    };
   }
   changed();
 }
@@ -816,7 +960,9 @@ async function enrichCatalog() {
           SOURCES[index] = {...SOURCES[index], genres: []};
           return;
         }
-        const poster = facts.poster ?? SOURCES[index].poster;
+        // Solo el cartel de TMDb: ya no hay miniatura del archivo a la que
+        // caer, y una imagen lenta es peor que ninguna.
+        const poster = facts.poster;
         SOURCES[index] = {
           ...SOURCES[index],
           poster,
@@ -835,6 +981,176 @@ async function enrichCatalog() {
     );
     changed();
   }
+  // Ya con cara: esto es lo que merece la pena guardar para el siguiente
+  // arranque.
+  saveCatalogCache();
+}
+
+/* --------------------------------------------------------------------------
+ * Series de TMDb
+ * ------------------------------------------------------------------------ */
+
+/**
+ * Series de verdad —con sus temporadas, sus episodios y el fotograma de cada
+ * uno— traídas de TMDb (ver `fetchSeriesPage`).
+ *
+ * Mismo trato que el catálogo de pruebas y por el mismo motivo: TMDb no sirve
+ * vídeo, así que cada episodio se abre con uno de muestra. La ficha es real y
+ * la serie no: sirve para ver la app llena y probar la navegación de series,
+ * no para publicar. Por eso se trae a mano desde Diagnóstico.
+ *
+ * Lo traído sí se guarda en disco (mismo trato que el listado del archivo): la
+ * gracia de traerlas una vez es no volver a pedirlas en cada arranque.
+ */
+const SERIES_KEY = 'catalog.series.v1';
+
+/** Última página de series traída; 0 = ninguna. */
+let seriesPage = 0;
+
+/** Cuántas series hay en el catálogo venidas de TMDb. */
+export const tmdbSeriesCount = () =>
+  new Set(
+    SOURCES.filter(item => item.kind === 'episode' && item.tmdbId).map(
+      item => item.series?.id,
+    ),
+  ).size;
+
+/** Tope de episodios guardados: lo que cabe sin engordar el almacén. */
+const SERIES_MAX = 600;
+
+/** Guarda los episodios de TMDb que hay ahora. */
+async function saveSeriesCache() {
+  const saved = SOURCES.filter(
+    item => item.kind === 'episode' && item.tmdbId,
+  ).slice(0, SERIES_MAX);
+  if (saved.length === 0) {
+    return;
+  }
+  try {
+    await AsyncStorage.setItem(
+      SERIES_KEY,
+      JSON.stringify({
+        at: Date.now(),
+        page: seriesPage,
+        movies: saved,
+      } satisfies CachedCatalog),
+    );
+  } catch {
+    // Igual que con el listado: sin sitio en disco se sigue sin guardar.
+  }
+}
+
+export const clearSeriesCache = () =>
+  AsyncStorage.removeItem(SERIES_KEY).catch(() => {});
+
+let seriesHydrated = false;
+
+/** Pone en el catálogo las series guardadas la última vez. */
+export async function hydrateSeries() {
+  if (seriesHydrated) {
+    return;
+  }
+  seriesHydrated = true;
+  let cached: CachedCatalog | null = null;
+  try {
+    const raw = await AsyncStorage.getItem(SERIES_KEY);
+    const parsed = raw ? (JSON.parse(raw) as CachedCatalog) : null;
+    if (
+      parsed &&
+      Array.isArray(parsed.movies) &&
+      Date.now() - parsed.at <= CATALOG_MAX_AGE
+    ) {
+      cached = parsed;
+    }
+  } catch {
+    cached = null;
+  }
+  if (!cached) {
+    return;
+  }
+  // Por serie y episodio, no por `uri`: los vídeos de muestra van en rotación
+  // y se repiten, así que por uri se tirarían episodios buenos.
+  const episodeKey = (item: Source) =>
+    `${item.series?.id}|${item.episode?.season}|${item.episode?.number}`;
+  const known = new Set(SOURCES.map(episodeKey));
+  const fresh = cached.movies.filter(item => !known.has(episodeKey(item)));
+  if (fresh.length === 0) {
+    return;
+  }
+  SOURCES.push(...fresh);
+  seriesPage = Math.max(seriesPage, cached.page);
+  changed();
+}
+
+/**
+ * Trae la siguiente página de series populares y las añade al catálogo, un
+ * episodio por entrada: es lo que espera `allSeries`, que las agrupa por
+ * `series.id`.
+ */
+export async function loadTmdbSeries() {
+  if (state.loading) {
+    return;
+  }
+  state = {loading: true, error: null, done: false};
+  changed();
+  try {
+    const found = await fetchSeriesPage(seriesPage + 1);
+    const known = new Set(
+      SOURCES.map(item => item.series?.id).filter(Boolean) as string[],
+    );
+    const fresh: Source[] = [];
+    found
+      .filter(series => !known.has(`tmdb:${series.tmdbId}`))
+      .forEach(series => {
+        const meta = {
+          id: `tmdb:${series.tmdbId}`,
+          title: series.title,
+          description: series.overview ?? '',
+          poster: series.poster,
+          backdrop: series.backdrop,
+        };
+        series.episodes.forEach(episode => {
+          fresh.push({
+            kind: 'episode',
+            label: `T${episode.season} E${episode.number}`,
+            title: episode.title,
+            description: episode.overview ?? series.overview ?? '',
+            // El fotograma del episodio cuando lo hay; si no, el cartel de la
+            // serie, que siempre está.
+            poster: episode.still ?? series.poster,
+            backdrop: series.backdrop,
+            year: episode.year ?? series.year,
+            genres: series.genres,
+            tmdbId: series.tmdbId,
+            series: meta,
+            episode: {season: episode.season, number: episode.number},
+            source: {
+              uri:
+                DEMO_STREAMS[
+                  (SOURCES.length + fresh.length) % DEMO_STREAMS.length
+                ] ?? '',
+              metadata: {
+                title: episode.title,
+                subtitle: `${series.title} · T${episode.season} E${episode.number}`,
+                artist: 'TMDb (pruebas)',
+                imageUri: episode.still ?? series.poster,
+              },
+            },
+          });
+        });
+      });
+    SOURCES.push(...fresh);
+    seriesPage += 1;
+    state = {loading: false, error: null, done: false};
+    saveSeriesCache();
+  } catch (error) {
+    state = {
+      loading: false,
+      error: String((error as Error).message ?? error),
+      done: false,
+    };
+  }
+  changed();
 }
 
 /** Siguiente página del archivo: es lo que hace el botón «cargar más». */
@@ -881,9 +1197,12 @@ let tmdbPage = 0;
 /** Cuántas páginas (de 20 títulos) se traen de una vez. */
 const TMDB_BATCH = 5;
 
-/** Cuántos títulos de TMDb hay ya en el catálogo. */
+/** Cuántas películas de prueba de TMDb hay ya en el catálogo. */
 export const tmdbCount = () =>
-  SOURCES.reduce((total, item) => total + (item.tmdbId ? 1 : 0), 0);
+  SOURCES.reduce(
+    (total, item) => total + (item.tmdbId && item.kind === 'movie' ? 1 : 0),
+    0,
+  );
 
 /**
  * Trae el siguiente tramo del catálogo de TMDb y lo añade al final. Las filas
@@ -893,7 +1212,7 @@ export async function loadTmdbCatalog() {
   if (state.loading) {
     return;
   }
-  state = {loading: true, error: null};
+  state = {loading: true, error: null, done: false};
   changed();
   try {
     const known = new Set(SOURCES.map(item => item.tmdbId));
@@ -932,9 +1251,13 @@ export async function loadTmdbCatalog() {
       // entera al final.
       changed();
     }
-    state = {loading: false, error: null};
+    state = {loading: false, error: null, done: false};
   } catch (error) {
-    state = {loading: false, error: String((error as Error).message ?? error)};
+    state = {
+      loading: false,
+      error: String((error as Error).message ?? error),
+      done: false,
+    };
   }
   changed();
 }

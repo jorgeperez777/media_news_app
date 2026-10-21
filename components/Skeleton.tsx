@@ -84,6 +84,38 @@ export function SkeletonRow({
   );
 }
 
+/** Rejilla de huecos, para las pantallas de «Ver todo» y Favoritos. */
+export function SkeletonGrid({
+  rows,
+  columns,
+  width,
+  height,
+  gap = 10,
+  style,
+}: {
+  rows: number;
+  columns: number;
+  width: number;
+  height: number;
+  gap?: number;
+  style?: ViewStyle;
+}) {
+  return (
+    <View style={[{gap}, style]}>
+      {Array.from({length: rows}, (_, row) => (
+        <SkeletonRow
+          key={row}
+          count={columns}
+          width={width}
+          height={height}
+          radius={12}
+          gap={gap}
+        />
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   block: {backgroundColor: '#2e2e33'},
   row: {flexDirection: 'row', overflow: 'hidden'},

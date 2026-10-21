@@ -1,5 +1,13 @@
-import React, {useSyncExternalStore} from 'react';
-import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import React, {useEffect, useSyncExternalStore} from 'react';
+import {
+  BackHandler,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import {ArrowBackIcon} from '../components/icons';
 import {useTabBarSpace} from '../components/TabBar';
 import {MINI_HEIGHT} from '../components/PlayerHost';
 import {formatTime, mbps} from 'react-native-video/controls';
@@ -12,7 +20,17 @@ import {
   type LanguagePreference,
 } from '../i18n';
 import {usePlayer} from '../player/PlayerContext';
-import {catalogState, loadTmdbCatalog, tmdbCount, useCatalog} from '../sources';
+import {
+  archiveCount,
+  catalogState,
+  clearCatalogCache,
+  clearSeriesCache,
+  loadTmdbCatalog,
+  loadTmdbSeries,
+  tmdbCount,
+  tmdbSeriesCount,
+  useCatalog,
+} from '../sources';
 import {saveLanguage} from '../player/storage';
 import {
   clearSessions,
@@ -23,13 +41,24 @@ import {
 } from '../player/telemetry';
 
 /**
- * Pestaña Perfil: el panel de QoE. En una app real estas métricas se mandarían a un
+ * Diagnóstico: el panel de QoE. En una app real estas métricas se mandarían a un
  * servidor; aquí se enseñan tal cual para poder mirarlas mientras se desarrolla.
+ *
+ * Se abre desde Perfil, así que llega con su propio «atrás» (el de la barra del
+ * móvil también vale).
  */
-export default function DiagnosticsScreen() {
+export default function DiagnosticsScreen({onBack}: {onBack: () => void}) {
   const player = usePlayer();
   const tabBarSpace = useTabBarSpace();
   const sessions = useSyncExternalStore(subscribe, getSessions);
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onBack]);
 
   return (
     <ScrollView
@@ -42,9 +71,25 @@ export default function DiagnosticsScreen() {
             (player.index !== null && player.mode === 'mini' ? MINI_HEIGHT : 0),
         },
       ]}>
+      <View style={styles.head}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('screen.close')}
+          onPress={onBack}
+          hitSlop={12}
+          style={({pressed}) => [styles.back, pressed && styles.pressed]}>
+          <ArrowBackIcon size={22} />
+        </Pressable>
+        <Text style={styles.screenTitle}>{t('profile.diagnostics')}</Text>
+      </View>
+
       <LanguagePicker />
 
       <TmdbCatalog />
+
+      <TmdbSeries />
+
+      <ArchiveCache />
 
       {/* Atribución: TMDb la exige en sus términos cuando usas su API. */}
       <Text style={styles.heading}>{t('credits.title')}</Text>
@@ -187,6 +232,76 @@ function Metric({
 }
 
 /**
+ * Series de TMDb, también a mano.
+ *
+ * Son dos peticiones por serie (la popular y su primera temporada) y los
+ * episodios no tienen película detrás: se abren con un vídeo de muestra (ver
+ * `loadTmdbSeries`). Lo traído se queda guardado y vuelve en el siguiente
+ * arranque.
+ */
+function TmdbSeries() {
+  useCatalog();
+  const {loading} = catalogState();
+  const count = tmdbSeriesCount();
+
+  return (
+    <>
+      <Text style={styles.heading}>{t('tv.title')}</Text>
+      <Text style={styles.hint}>{t('tv.intro')}</Text>
+      <View style={styles.actions}>
+        <Text style={styles.count}>{t('tv.loaded', {count})}</Text>
+        <View style={styles.buttons}>
+          {count > 0 && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => clearSeriesCache()}
+              style={({pressed}) => [styles.button, pressed && styles.pressed]}>
+              <Text style={styles.buttonText}>{t('catalog.clearCache')}</Text>
+            </Pressable>
+          )}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{disabled: loading}}
+            disabled={loading}
+            onPress={() => loadTmdbSeries()}
+            style={({pressed}) => [
+              styles.button,
+              (pressed || loading) && styles.pressed,
+            ]}>
+            <Text style={styles.buttonText}>
+              {t(loading ? 'tv.loading' : 'tv.load')}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </>
+  );
+}
+
+/**
+ * Lo que hay guardado del archivo y el botón de tirarlo.
+ *
+ * Está aquí porque es lo que hace falta para comprobarlo: vaciar, reiniciar la
+ * app y ver si el listado aparece al instante o si hay que esperar a la red.
+ */
+function ArchiveCache() {
+  useCatalog();
+  const count = archiveCount();
+
+  return (
+    <View style={styles.actions}>
+      <Text style={styles.count}>{t('catalog.cached', {count})}</Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => clearCatalogCache()}
+        style={({pressed}) => [styles.button, pressed && styles.pressed]}>
+        <Text style={styles.buttonText}>{t('catalog.clearCache')}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/**
  * Catálogo de pruebas de TMDb, a mano.
  *
  * A mano y aquí dentro a propósito: son miles de peticiones de fichas que no
@@ -224,6 +339,9 @@ function TmdbCatalog() {
 
 const styles = StyleSheet.create({
   container: {padding: 16, gap: 10},
+  head: {flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6},
+  back: {width: 36, height: 36, alignItems: 'center', justifyContent: 'center'},
+  screenTitle: {color: '#fff', fontSize: 22, fontWeight: '800'},
   language: {gap: 10, marginBottom: 6},
   languageRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
   chip: {
@@ -244,7 +362,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 4,
   },
-  count: {color: '#aaa', fontSize: 12},
+  count: {color: '#aaa', fontSize: 12, flex: 1},
+  buttons: {flexDirection: 'row', gap: 8},
   button: {
     backgroundColor: '#272727',
     paddingHorizontal: 12,

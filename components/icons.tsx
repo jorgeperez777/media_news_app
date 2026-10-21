@@ -21,7 +21,11 @@ function Icon({
   size,
   color = WHITE,
   path,
-}: {size: number; color?: string; path: string}) {
+}: {
+  size: number;
+  color?: string;
+  path: string;
+}) {
   // Un id por icono montado: dos degradados con el mismo id se pisan.
   const id = `i${React.useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const gradient = color === GRADIENT;
@@ -80,8 +84,7 @@ const PATHS = {
   airplay:
     'M6 22h12l-6-6-6 6zM21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V5h18v12h-4v2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z',
   arrowBack: 'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z',
-  lock:
-    'M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z',
+  lock: 'M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z',
   lockOpen:
     'M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h2c0-1.66 1.34-3 3-3s3 1.34 3 3v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z',
   episodes: 'M4 6h12v2H4zm0 4h12v2H4zm0 4h8v2H4zm10 0v6l5-3z',
@@ -89,6 +92,17 @@ const PATHS = {
   news: 'M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H4V5h16v14zM6 7h7v6H6zm8 0h4v2h-4zm0 4h4v2h-4zM6 15h12v2H6z',
   favorite:
     'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54z',
+  // Globo terráqueo para el idioma: el círculo y los husos, sin más detalle
+  // del que se ve a 22 dp.
+  // Aro, ecuador y meridiano. Cada hueco se dibuja en sentido contrario al
+  // trazo que lo rodea: así el relleno por defecto (nonzero) los deja vacíos
+  // en vez de pintar un disco macizo.
+  language:
+    'M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20zM12 4a8 8 0 1 1 0 16a8 8 0 1 1 0-16zM4.5 10.6h15v2.8h-15zM12 2.5c2.2 0 4 4.3 4 9.5s-1.8 9.5-4 9.5-4-4.3-4-9.5 1.8-9.5 4-9.5zM12 4.5c-1.1 0-2 3.4-2 7.5s.9 7.5 2 7.5 2-3.4 2-7.5-.9-7.5-2-7.5z',
+  // Barras de cobertura: el ahorro de datos va de cuánta red se gasta.
+  signal: 'M3 17h3v4H3v-4zm5.5-5h3v9h-3v-9zM14 7h3v14h-3V7zm5.5-5h3v19h-3V2z',
+  delete:
+    'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
 };
 
 export function PlayIcon({size = 36, color}: IconProps) {
@@ -187,7 +201,9 @@ export function LockIcon({
   size = 22,
   color,
 }: IconProps & {open?: boolean}) {
-  return <Icon size={size} color={color} path={open ? PATHS.lockOpen : PATHS.lock} />;
+  return (
+    <Icon size={size} color={color} path={open ? PATHS.lockOpen : PATHS.lock} />
+  );
 }
 
 export function EpisodesIcon({size = 24, color}: IconProps) {
@@ -206,7 +222,11 @@ export function SubtitlesIcon({
   activeColor = '#3ea6ff',
 }: IconProps & {active?: boolean; activeColor?: string}) {
   return (
-    <Icon size={size} color={active ? activeColor : color} path={PATHS.closedCaption} />
+    <Icon
+      size={size}
+      color={active ? activeColor : color}
+      path={PATHS.closedCaption}
+    />
   );
 }
 
@@ -234,8 +254,56 @@ export function FavoriteIcon({size = 22, color}: IconProps) {
   return <Icon size={size} color={color} path={PATHS.favorite} />;
 }
 
+/**
+ * La pestaña de TV en vivo: la pantalla con las letras «TV» y el ángulo
+ * debajo, como el icono de las apps de televisión.
+ *
+ * No sale de Material Symbols, así que no puede usar `Icon`: se dibuja con
+ * trazos, y el degradado de la marca (ver `GRADIENT`) tiene que pintar también
+ * el `stroke`, no solo el relleno.
+ */
 export function LiveTvIcon({size = 22, color}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.liveTv} />;
+  const id = `tv${React.useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  const gradient = color === GRADIENT;
+  const paint = gradient ? `url(#${id})` : color ?? WHITE;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      {gradient ? (
+        <Defs>
+          <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={ACCENT} />
+            <Stop offset="1" stopColor={ACCENT_END} />
+          </LinearGradient>
+        </Defs>
+      ) : null}
+      {/* La pantalla, abierta por abajo para que entre el ángulo. */}
+      <Path
+        d="M8 15.5H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v6.5a3 3 0 0 1-3 3h-2"
+        fill="none"
+        stroke={paint}
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+      {/* «TV» dentro. */}
+      <Path
+        d="M6.8 6.4h4.6M9.1 6.4v5.4M12.9 6.4l2.2 5.4 2.2-5.4"
+        fill="none"
+        stroke={paint}
+        strokeWidth={1.9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* El ángulo, apoyado en el hueco de abajo. */}
+      <Path
+        d="M7.5 19.8 12 14.9l4.5 4.9"
+        fill="none"
+        stroke={paint}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
 }
 
 export function VideoLibraryIcon({size = 22, color}: IconProps) {
@@ -248,6 +316,18 @@ export function SearchIcon({size = 22, color}: IconProps) {
 
 export function PersonIcon({size = 22, color}: IconProps) {
   return <Icon size={size} color={color} path={PATHS.person} />;
+}
+
+export function LanguageIcon({size = 22, color}: IconProps) {
+  return <Icon size={size} color={color} path={PATHS.language} />;
+}
+
+export function SignalIcon({size = 22, color}: IconProps) {
+  return <Icon size={size} color={color} path={PATHS.signal} />;
+}
+
+export function DeleteIcon({size = 22, color}: IconProps) {
+  return <Icon size={size} color={color} path={PATHS.delete} />;
 }
 
 /**

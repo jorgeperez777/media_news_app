@@ -4,19 +4,28 @@ import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 import FadeIn from './components/FadeIn';
 import PlayerHost from './components/PlayerHost';
 import Sheet from './components/Sheet';
+import Underlay from './components/Underlay';
 import TabBar, {type TabKey} from './components/TabBar';
 import {PlayerProvider, usePlayer} from './player/PlayerContext';
 import {setLanguage, useLanguage} from './i18n';
 import {setControlsLanguage} from 'react-native-video/controls';
 import {loadLanguage} from './player/storage';
-import {isLive, loadMovies, seriesById} from './sources';
+import {
+  hydrateCatalog,
+  hydrateSeries,
+  isLive,
+  loadMovies,
+  seriesById,
+} from './sources';
 import DetailScreen from './screens/DetailScreen';
 import DiagnosticsScreen from './screens/DiagnosticsScreen';
+import ProfileScreen from './screens/ProfileScreen';
 import FavouritesScreen from './screens/FavouritesScreen';
 import HomeScreen from './screens/HomeScreen';
 import CategoryScreen, {type Category} from './screens/CategoryScreen';
 import SeriesScreen from './screens/SeriesScreen';
 import LiveScreen from './screens/LiveScreen';
+import NewsHomeScreen from './screens/NewsHomeScreen';
 import NewsScreen from './screens/NewsScreen';
 import PlaceholderScreen from './screens/PlaceholderScreen';
 
@@ -49,9 +58,14 @@ function Main() {
   // El idioma elegido se recuerda; hasta que llega, manda el del dispositivo.
   useEffect(() => {
     loadLanguage().then(setLanguage);
-    // Películas reales del Internet Archive, al final del catálogo de ejemplo.
+    // Primero lo que ya se trajo la última vez, que está en disco y aparece
+    // sin red; después, si hace falta, el archivo. En ese orden: con el
+    // listado guardado al día, `loadMovies` no pide nada.
+    //
     // Si falla no pasa nada: la app se queda con lo que trae de serie.
-    loadMovies();
+    hydrateCatalog().then(() => loadMovies());
+    // Las series de TMDb que se trajeron alguna vez (ver `loadTmdbSeries`).
+    hydrateSeries();
   }, []);
   // Fichas abiertas dentro de la pestaña (una pila de dos niveles): la de una
   // serie o la de una película. Ninguna de las dos lleva reproductor: se mira la
@@ -63,6 +77,8 @@ function Main() {
   const [category, setCategory] = useState<Category | null>(null);
   // Noticia abierta dentro de la pestaña Noticias (ver `news.ts`).
   const [news, setNews] = useState<string | null>(null);
+  // Diagnóstico, abierto encima de Perfil.
+  const [diagnostics, setDiagnostics] = useState(false);
   const series = seriesId ? seriesById(seriesId) : undefined;
   // Estables: si cambiaran en cada render, el BackHandler de la ficha se volvería
   // a registrar sin parar.
@@ -75,9 +91,6 @@ function Main() {
   // abren dentro de esa pestaña.
   const vodTab = tab === 'inicio';
 
-  // La ficha de película se abre desde una carátula, no por tener el vídeo
-  // sonando: el reproductor ya no vive aquí dentro.
-  const showDetail = vodTab && movie !== null && !series;
   // El reproductor tapa la app entera: fuera barra de pestañas e insets.
   const covering =
     player.mode !== 'mini' &&
@@ -85,7 +98,7 @@ function Main() {
 
   /** Si esa pestaña es «la casa» de lo que está abierto en el reproductor. */
   const isHomeFor = (next: TabKey) =>
-    isLive(player.index) ? next === 'noticias' : next === 'inicio';
+    isLive(player.index) ? next === 'envivo' : next === 'inicio';
 
   /** Cambiar de pestaña, venga de la barra o de un botón de una pantalla. */
   const goTo = (next: TabKey) => {
@@ -94,6 +107,7 @@ function Main() {
     setMovie(null);
     setCategory(null);
     setNews(null);
+    setDiagnostics(false);
     if (player.index !== null && !isHomeFor(next)) {
       // Ir a una pestaña que no es la suya lo deja en miniplayer; si no, el
       // vídeo taparía la pestaña nueva.
@@ -108,20 +122,37 @@ function Main() {
   };
 
   /**
-   * Lo que va **encima** de la pantalla de la pestaña: la ficha, la rejilla de
-   * «Ver todo» o la noticia. Se monta aparte para que la de abajo siga viva y
-   * conserve su scroll.
+   * Lo que va **encima** de Inicio, en capas: la rejilla de «Ver todo», la
+   * ficha de una serie y la de una película, cada una sobre la anterior.
+   *
+   * Son tres capas y no un hueco con tres inquilinos porque abrir una ficha no
+   * debe desmontar lo de debajo: si la rejilla se desmonta, al volver empieza
+   * otra vez por arriba y hay que bajar de nuevo hasta donde estabas.
    */
-  const vodOverlay = showDetail ? (
-    <DetailScreen index={movie} onBack={closeMovie} onOpenMovie={setMovie} />
-  ) : series ? (
+  const categoryLayer = category ? (
+    <CategoryScreen
+      category={category}
+      onBack={closeCategory}
+      onOpenMovie={setMovie}
+      onOpenSeries={setSeriesId}
+    />
+  ) : null;
+  const seriesLayer = series ? (
     <SeriesScreen
       series={series}
       onBack={closeSeries}
       onOpenSeries={setSeriesId}
       onOpenMovie={setMovie}
     />
-  ) : category ? (
+  ) : null;
+  const detailLayer =
+    movie !== null ? (
+      <DetailScreen index={movie} onBack={closeMovie} onOpenMovie={setMovie} />
+    ) : null;
+  const covered = !!(categoryLayer || seriesLayer || detailLayer);
+
+  /** Encima de TV en vivo solo cabe la rejilla de canales. */
+  const liveOverlay = category ? (
     <CategoryScreen
       category={category}
       onBack={closeCategory}
@@ -130,17 +161,9 @@ function Main() {
     />
   ) : null;
 
+  /** Encima de Noticias, la noticia abierta. */
   const newsOverlay =
-    news !== null ? (
-      <NewsScreen id={news} onBack={closeNews} />
-    ) : category ? (
-      <CategoryScreen
-        category={category}
-        onBack={closeCategory}
-        onOpenMovie={setMovie}
-        onOpenSeries={setSeriesId}
-      />
-    ) : null;
+    news !== null ? <NewsScreen id={news} onBack={closeNews} /> : null;
 
   return (
     <View style={styles.root} ref={player.rootRef} collapsable={false}>
@@ -153,14 +176,22 @@ function Main() {
         {/* `key={tab}`: al cambiar de pestaña se monta otro y la entrada se
             repite (ver `FadeIn`). */}
         <FadeIn key={tab} style={styles.screens}>
-          {tab === 'noticias' ? (
-            // Noticias también es una pila: la guía abajo y, encima, la noticia o
-            // la rejilla de canales.
+          {tab === 'envivo' ? (
+            // TV en vivo también es una pila: la guía de canales abajo y,
+            // encima, la rejilla de «Ver todo».
             <View style={styles.stack}>
-              <LiveScreen
-                onSeeAll={() => setCategory('live')}
-                onOpenNews={setNews}
-              />
+              <Underlay covered={!!liveOverlay}>
+                <LiveScreen onSeeAll={() => setCategory('live')} />
+              </Underlay>
+              <Sheet>{liveOverlay}</Sheet>
+            </View>
+          ) : tab === 'noticias' ? (
+            // Noticias no está en la barra (ver `TabBar`): se llega desde una
+            // noticia guardada en Favoritos.
+            <View style={styles.stack}>
+              <Underlay covered={!!newsOverlay}>
+                <NewsHomeScreen onOpenNews={setNews} />
+              </Underlay>
               <Sheet>{newsOverlay}</Sheet>
             </View>
           ) : vodTab ? (
@@ -168,14 +199,20 @@ function Main() {
             // encima. Si se desmontara, al volver la portada empezaría otra vez
             // desde arriba y se perdería por dónde iba el scroll.
             <View style={styles.stack}>
-              <HomeScreen
-                onOpenSeries={setSeriesId}
-                onOpenMovie={setMovie}
-                onSeeAll={setCategory}
-                // Tapada no tiene que seguir pasando destacados sola.
-                active={!vodOverlay}
-              />
-              <Sheet>{vodOverlay}</Sheet>
+              {/* Da un paso atrás cuando se le pone algo encima: se ve que
+                  sigue ahí, detrás. */}
+              <Underlay covered={covered}>
+                <HomeScreen
+                  onOpenSeries={setSeriesId}
+                  onOpenMovie={setMovie}
+                  onSeeAll={setCategory}
+                  // Tapada no tiene que seguir pasando destacados sola.
+                  active={!covered}
+                />
+              </Underlay>
+              <Sheet>{categoryLayer}</Sheet>
+              <Sheet>{seriesLayer}</Sheet>
+              <Sheet>{detailLayer}</Sheet>
             </View>
           ) : tab === 'favoritos' ? (
             <FavouritesScreen
@@ -188,7 +225,20 @@ function Main() {
               }}
             />
           ) : tab === 'perfil' ? (
-            <DiagnosticsScreen />
+            // Perfil es la portada; Diagnóstico se abre encima, como una ficha.
+            <View style={styles.stack}>
+              <Underlay covered={diagnostics}>
+                <ProfileScreen
+                  onGo={goTo}
+                  onDiagnostics={() => setDiagnostics(true)}
+                />
+              </Underlay>
+              <Sheet>
+                {diagnostics ? (
+                  <DiagnosticsScreen onBack={() => setDiagnostics(false)} />
+                ) : null}
+              </Sheet>
+            </View>
           ) : (
             <PlaceholderScreen tab={tab} />
           )}

@@ -12,7 +12,8 @@ import {usePlayer} from '../player/PlayerContext';
 import {t} from '../i18n';
 import {useTabBarSpace} from '../components/TabBar';
 import {MINI_HEIGHT} from '../components/PlayerHost';
-import Poster from '../components/Poster';
+import Poster, {GRID_COLUMNS, GRID_GAP, posterSize} from '../components/Poster';
+import {SkeletonGrid} from '../components/Skeleton';
 import {loadFavourites, loadPositions, type Positions} from '../player/storage';
 
 /**
@@ -36,9 +37,15 @@ export default function FavouritesScreen({
   const [uris, setUris] = useState<string[]>([]);
   const [positions, setPositions] = useState<Positions>({});
   // Se relee al volver de un vídeo: puede haberse añadido o quitado desde la ficha.
+  // Leer el almacén es rápido, pero no instantáneo: hasta que llega se enseñan
+  // huecos, que es mejor que el «no hay nada» de un segundo.
+  const [ready, setReady] = useState(false);
   useEffect(() => {
-    loadFavourites().then(setUris);
-    loadPositions().then(setPositions);
+    Promise.all([loadFavourites(), loadPositions()]).then(([list, saved]) => {
+      setUris(list);
+      setPositions(saved);
+      setReady(true);
+    });
   }, [player.index]);
 
   // Lo guardado desde una noticia se apunta como `news:<id>` (ver `NewsScreen`).
@@ -54,9 +61,8 @@ export default function FavouritesScreen({
     })
     .filter(item => item !== null);
 
-  // Dos columnas con el mismo margen que las demás pantallas.
-  const cardWidth = Math.floor((width - 16 * 2 - 10) / 2);
-  const cardHeight = Math.round(cardWidth * 1.5);
+  // La misma carátula que en Inicio y en las rejillas de «Ver todo».
+  const {width: cardWidth, height: cardHeight} = posterSize(width);
 
   return (
     <ScrollView
@@ -69,7 +75,16 @@ export default function FavouritesScreen({
       }}>
       <Text style={styles.heading}>{t('screen.favouritesTitle')}</Text>
 
-      {items.length === 0 && articles.length === 0 ? (
+      {!ready ? (
+        <SkeletonGrid
+          rows={2}
+          columns={GRID_COLUMNS}
+          width={cardWidth}
+          height={cardHeight}
+          gap={GRID_GAP}
+          style={styles.skeleton}
+        />
+      ) : items.length === 0 && articles.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyText}>{t('favourites.empty')}</Text>
           <Text style={styles.hint}>{t('favourites.hint')}</Text>
@@ -133,6 +148,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 12,
   },
+  skeleton: {paddingHorizontal: 16},
   empty: {paddingHorizontal: 16, gap: 8},
   emptyText: {color: '#ccc', fontSize: 14},
   hint: {color: '#888', fontSize: 12, lineHeight: 17},
@@ -140,6 +156,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 16,
-    gap: 10,
+    gap: GRID_GAP,
   },
 });
