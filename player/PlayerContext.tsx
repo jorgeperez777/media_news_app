@@ -108,6 +108,9 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
       setIndex(next);
       setMode('full');
       setPresentation(options?.presentation ?? 'inline');
+      // La pantalla completa la lleva este contexto (ver `fullscreen` en
+      // PlayerHost): un inmersivo nace en ella, uno empotrado no.
+      setFullscreen(options?.presentation === 'immersive');
       setFromStart(options?.fromStart ?? false);
       setPaused(false);
       setError(null);

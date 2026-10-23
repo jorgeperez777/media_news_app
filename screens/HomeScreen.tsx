@@ -1,16 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {
-  Animated,
-  FlatList,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import {Animated, FlatList, Image, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View} from 'react-native';
+import Text from '../components/Text';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import SOURCES, {
@@ -37,6 +27,7 @@ import {loadPositions, resumeFrom, type Positions} from '../player/storage';
 import {formatLength} from '../components/format';
 import Skeleton, {SkeletonRow} from '../components/Skeleton';
 import type {Category} from './CategoryScreen';
+import {FONT} from '../theme';
 
 /** Cada cuánto pasa solo a la siguiente página el carrusel de destacados. */
 const HERO_AUTOPLAY_MS = 5000;
@@ -622,8 +613,8 @@ export default function HomeScreen({
           pointerEvents="none"
           style={[
             StyleSheet.absoluteFill,
-            styles.headerBack,
-            {opacity: headerOpacity},
+                        styles.headerBack,
+                        {opacity: headerOpacity},
           ]}
         />
 
@@ -873,6 +864,7 @@ function Row({
 }
 
 const styles = StyleSheet.create({
+  headerBack: {backgroundColor: '#0f0f0f'},
   container: {flex: 1, backgroundColor: '#0f0f0f'},
   seeAllCard: {
     borderRadius: 10,
@@ -904,7 +896,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
   },
-  headerBack: {backgroundColor: '#0f0f0f'},
   searchButton: {
     width: 36,
     height: 36,
@@ -914,7 +905,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   searchBack: {backgroundColor: '#1f1f22'},
-  headerTitle: {color: '#fff', fontSize: 20, fontWeight: '800'},
+  headerTitle: {
+    fontFamily: FONT,
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
+  },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -924,6 +920,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   input: {
+    fontFamily: FONT,
     flex: 1,
     paddingHorizontal: 14,
     paddingVertical: 10,

@@ -1,3 +1,5 @@
+import {Platform} from 'react-native';
+
 /**
  * Los colores de la marca.
  *
@@ -20,3 +22,11 @@ export const ACCENT_END = '#972B99';
  * el precio de una vista, sin SVG ni librerías (mismo truco que `SCRIM`).
  */
 export const PROGRESS_GRADIENT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAABCAYAAABubagXAAAA8UlEQVR42gXB41YDAACA0d6nrbl5qxn9z7bdybbdybZt28bbfN3r4e/3R4D7l0D3D0Gub4JdX4Q4Pwl1fhDmeCfc8UaE/ZVI+wtRtmeibU/EWB+JtT4QZ7kn3nJHgvmWRPMNSaZrkk1XpPhekupzQZrPOenGMzKMp2QaTsgyHJOtPyJHf0iu7oA83T752j0KtLsUanYo0mxTrN6iRL1JqWqDMtU65co1KpSrVHqvUKVYplqxRI18kVr5AnWyeeplczRIZ2mUztAkmaZZMkWLeJJW8QRtonHaRWN0eI3S6TVCl3CYbuEQPYJBegUD9Hn28w/6CJqBH8XYXAAAAABJRU5ErkJggg==';
+
+/**
+ * La letra de la app: la de iOS (SF Pro) en las dos plataformas. En iOS es la
+ * del sistema y no hace falta nombrarla; en Android no se puede usar (su
+ * licencia la limita a Apple), así que va Inter, dibujada a su imagen y casi
+ * indistinguible (ver `res/font/inter.xml` y `MainApplication`).
+ */
+export const FONT = Platform.OS === 'android' ? 'Inter' : undefined;

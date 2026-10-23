@@ -1,11 +1,6 @@
 import React, {useEffect, useState} from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import {ScrollView, StyleSheet, useWindowDimensions, View} from 'react-native';
+import Text from '../components/Text';
 import SOURCES, {seriesOf} from '../sources';
 import {articleById} from '../news';
 import {usePlayer} from '../player/PlayerContext';

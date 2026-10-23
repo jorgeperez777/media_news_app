@@ -7,6 +7,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import {ArrowBackIcon} from './icons';
+import {FONT} from '../theme';
 
 /**
  * Cabecera de una ficha: al principio solo la flecha suelta sobre la portada
@@ -70,8 +71,8 @@ export default function ScreenHeader({
         pointerEvents="none"
         style={[
           StyleSheet.absoluteFill,
-          styles.headerBack,
-          {opacity: headerOpacity},
+                    styles.headerBack,
+                    {opacity: headerOpacity},
         ]}
       />
 
@@ -102,6 +103,7 @@ export default function ScreenHeader({
 }
 
 const styles = StyleSheet.create({
+  headerBack: {backgroundColor: '#0f0f0f'},
   header: {
     position: 'absolute',
     top: 0,
@@ -113,8 +115,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 12,
   },
-  headerBack: {backgroundColor: '#0f0f0f'},
-  headerTitle: {flex: 1, color: '#fff', fontSize: 18, fontWeight: '800'},
+  headerTitle: {fontFamily: FONT,flex: 1, color: '#fff', fontSize: 18, fontWeight: '800'},
   back: {
     width: 40,
     height: 40,

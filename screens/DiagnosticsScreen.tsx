@@ -1,12 +1,6 @@
 import React, {useEffect, useSyncExternalStore} from 'react';
-import {
-  BackHandler,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import {BackHandler, Pressable, ScrollView, StyleSheet, View} from 'react-native';
+import Text from '../components/Text';
 import {ArrowBackIcon} from '../components/icons';
 import {useTabBarSpace} from '../components/TabBar';
 import {MINI_HEIGHT} from '../components/PlayerHost';

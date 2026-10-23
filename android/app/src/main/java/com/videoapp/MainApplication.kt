@@ -4,6 +4,7 @@ import android.app.Application
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
+import com.facebook.react.common.assets.ReactFontManager
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import org.wonday.orientation.OrientationActivityLifecycle
@@ -24,6 +25,9 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     loadReactNative(this)
+    // Inter con sus pesos (res/font/inter.xml): `fontFamily: 'Inter'` en JS, y
+    // `fontWeight` elige el archivo. En iOS se queda la del sistema (SF Pro).
+    ReactFontManager.getInstance().addCustomFont(this, "Inter", R.font.inter)
     // react-native-orientation-locker: necesario para lockToLandscape/Portrait.
     registerActivityLifecycleCallbacks(OrientationActivityLifecycle.getInstance())
   }

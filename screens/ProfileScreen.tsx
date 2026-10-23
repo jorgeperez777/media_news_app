@@ -1,12 +1,6 @@
 import React, {useEffect, useState} from 'react';
-import {
-  Pressable,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import {Pressable, ScrollView, Share, StyleSheet, View} from 'react-native';
+import Text from '../components/Text';
 import {
   getLanguagePreference,
   LANGUAGES,

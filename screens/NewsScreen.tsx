@@ -1,14 +1,6 @@
 import React, {useEffect, useState} from 'react';
-import {
-  BackHandler,
-  Pressable,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import {BackHandler, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View} from 'react-native';
+import Text from '../components/Text';
 import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import {articleById} from '../news';
 import {usePlayer} from '../player/PlayerContext';
@@ -67,7 +59,11 @@ export default function NewsScreen({
 
   // Atrás vuelve a la lista, salvo con el canal abierto: entonces manda el
   // reproductor y le dejamos el gesto devolviendo false.
-  const playing = player.index !== null && player.presentation === 'immersive';
+  // En el miniplayer no manda el reproductor: atrás es de esta pantalla.
+  const playing =
+    player.index !== null &&
+    player.presentation === 'immersive' &&
+    player.mode !== 'mini';
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (playing) {

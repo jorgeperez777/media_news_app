@@ -1,12 +1,6 @@
 import React, {useState} from 'react';
-import {
-  Animated,
-  Pressable,
-  ScrollView,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import {Animated, Pressable, ScrollView, useWindowDimensions, View} from 'react-native';
+import Text from '../components/Text';
 import {ARTICLES, FEATURED, RECOMMENDED, type Article} from '../news';
 import {usePlayer} from '../player/PlayerContext';
 import {t} from '../i18n';

@@ -1,14 +1,8 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {
-  PermissionsAndroid,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import {BackHandler, PermissionsAndroid, Platform, Pressable, StyleSheet, useWindowDimensions, View} from 'react-native';
+import Text from './Text';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import Orientation from 'react-native-orientation-locker';
 import SOURCES, {seriesOf, useCatalog} from '../sources';
 import {t} from '../i18n';
 import {usePlayer} from '../player/PlayerContext';
@@ -38,6 +32,9 @@ import {ACCENT_END, PROGRESS_GRADIENT} from '../theme';
  * sobre negro no cuenta nada.
  */
 const SLOW_MS = 10000;
+
+/** Lo que se queda en pantalla el aviso de «se detuvo el canal». */
+const NOTICE_MS = 3000;
 
 /** Alto de la barra del miniplayer y ancho del vídeo dentro de ella (16:9). */
 export const MINI_HEIGHT = 72;
@@ -152,6 +149,55 @@ function PlayerHost() {
   // así que la caja no lo acota desde el primer fotograma.
   const immersive = presentation === 'immersive';
 
+  // Un inmersivo tarda en resolver su vídeo, y hasta que no lo tiene el
+  // reproductor —que es quien rota a horizontal— no está montado. Sin esto, la
+  // carga se veía en vertical y de golpe saltaba a horizontal al cargar. Se
+  // rota ya, durante el spinner, para que nazca horizontal como Netflix.
+  //
+  // El reproductor, al montarse, se queda con el candado; al desmontarse vuelve
+  // a vertical. El único hueco es cerrar **mientras carga**: ahí no hay
+  // reproductor que lo deshaga, así que el botón atrás de Android lo cierra y
+  // devuelve el vertical a mano.
+  const waitingImmersive = waitingForSource && immersive && mode !== 'mini';
+  useEffect(() => {
+    if (!waitingImmersive) {
+      return;
+    }
+    Orientation.lockToLandscape();
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      Orientation.lockToPortrait();
+      player.close();
+      return true;
+    });
+    return () => sub.remove();
+  }, [waitingImmersive, player]);
+
+  /**
+   * Solo hay un reproductor: dar a Play en una película o un episodio con un
+   * canal en el miniplayer lo sustituye. No se pregunta —el gesto ya es claro—,
+   * pero se dice qué se ha parado, que si no el directo desaparece sin más. Al
+   * cerrar la película el canal no vuelve solo; para eso está TV en vivo.
+   */
+  const [stopped, setStopped] = useState<string | null>(null);
+  const previousIndex = useRef(index);
+  useEffect(() => {
+    const before = previousIndex.current;
+    previousIndex.current = index;
+    if (before === null || index === null || before === index) {
+      return;
+    }
+    const was = SOURCES[before];
+    if (was?.kind !== 'live' || SOURCES[index]?.kind === 'live') {
+      return;
+    }
+    setStopped(was.title);
+    const timer = setTimeout(() => setStopped(null), NOTICE_MS);
+    return () => {
+      clearTimeout(timer);
+      setStopped(null);
+    };
+  }, [index]);
+
   // Caja expandida: el hueco que publica la pantalla de detalle.
   const full = useMemo(
     () =>
@@ -234,6 +280,9 @@ function PlayerHost() {
         : badge,
       progress:
         saved && saved.duration > 0 ? saved.seconds / saved.duration : 0,
+      image: item.poster,
+      number: item.episode?.number,
+      description: item.description,
     };
   });
 
@@ -252,16 +301,19 @@ function PlayerHost() {
                     {t('screen.preparingSlow')}
                   </Text>
                 )}
-                {/* La salida. Aquí todavía no hay reproductor montado, así que
-                    tampoco está su flecha de volver: sin esto, un vídeo que no
-                    llega a resolverse deja la app encallada (en iOS no hay
-                    botón atrás del sistema). */}
-                <RoundButton
-                  accessibilityLabel={t('screen.close')}
-                  onPress={player.close}
-                  style={{...styles.waitingBack, top: insets.top + 8}}>
-                  <ArrowBackIcon size={22} />
-                </RoundButton>
+                {/* La salida mientras carga. En inmersivo no va: ya está en
+                    horizontal, el reproductor traerá su propia flecha al cargar
+                    y el atrás de Android cierra (ver el efecto de orientación).
+                    En empotrado sí, porque ahí no hay nada más de lo que tirar
+                    y en iOS no hay atrás del sistema. */}
+                {!immersive && (
+                  <RoundButton
+                    accessibilityLabel={t('screen.close')}
+                    onPress={player.close}
+                    style={{...styles.waitingBack, top: insets.top + 8}}>
+                    <ArrowBackIcon size={22} />
+                  </RoundButton>
+                )}
               </>
             )}
           </View>
@@ -319,17 +371,20 @@ function PlayerHost() {
             onSelectEpisode={id => player.goTo(Number(id))}
             nextUp={
               player.nextIndex !== null
-                ? {
-                    title: SOURCES[player.nextIndex].title,
-                    label: series ? t('next.nextEpisode') : undefined,
-                  }
+                ? nextCard(SOURCES[player.nextIndex], !!series)
                 : undefined
             }
             dataSaver={player.dataSaver}
             onDataSaverChange={player.setDataSaver}
             onError={player.setError}
+            // Controlada desde el contexto, para que la app pueda pedirla (al
+            // expandir desde el miniplayer, ver `App`).
+            fullscreen={player.fullscreen}
             onFullscreenChange={player.setFullscreen}
             onPipChange={player.setPip}
+            // Todo se puede mandar al miniplayer. El reproductor elige el
+            // botón: ⌄ junto al título en directo, y su propio icono arriba a
+            // la derecha en películas y episodios.
             onMinimize={player.minimize}
             hasPrevious={player.hasPrevious}
             hasNext={player.hasNext}
@@ -376,8 +431,32 @@ function PlayerHost() {
           </Pressable>
         </View>
       )}
+      {stopped && !isMini && (
+        <View
+          pointerEvents="none"
+          style={[styles.notice, {top: insets.top + 72}]}>
+          <Text style={styles.noticeText} numberOfLines={1}>
+            {t('player.stopped', {title: stopped})}
+          </Text>
+        </View>
+      )}
     </View>
   );
+}
+
+/** La tarjeta de «a continuación»: lo que el reproductor enseña del siguiente. */
+function nextCard(item: (typeof SOURCES)[number], inSeries: boolean) {
+  return {
+    title: item.title,
+    label: inSeries ? t('next.nextEpisode') : undefined,
+    image: item.poster,
+    subtitle: item.episode
+      ? t('screen.seriesBadge', {
+          season: item.episode.season,
+          number: item.episode.number,
+        })
+      : undefined,
+  };
 }
 
 const styles = StyleSheet.create({
@@ -389,8 +468,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   hostMini: {
-    // Un gris sólido, sin desenfoque: más barato y se ve igual en Android, donde
-    // el blur no llega a capturar el vídeo.
+    // Un gris sólido, sin desenfoque, en las dos plataformas.
     backgroundColor: '#1a1a1c',
     elevation: 12,
     shadowColor: '#000',
@@ -409,6 +487,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   waitingBack: {position: 'absolute', left: 16},
+  notice: {
+    position: 'absolute',
+    alignSelf: 'center',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    // Por encima del reproductor a pantalla completa (zIndex/elevation 100).
+    zIndex: 101,
+    elevation: 101,
+  },
+  noticeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    backgroundColor: 'rgba(28,28,32,0.92)',
+    borderRadius: 20,
+    overflow: 'hidden',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
   miniTap: {position: 'absolute', left: 0, top: 0, bottom: 0},
   miniControls: {
     flex: 1,

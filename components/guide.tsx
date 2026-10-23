@@ -1,15 +1,10 @@
 import React, {useRef} from 'react';
-import {
-  Animated,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import {Animated, Pressable, StyleSheet, TextInput, View} from 'react-native';
+import Text from './Text';
 import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import {CloseIcon, SearchIcon} from './icons';
 import {t} from '../i18n';
+import {FONT} from '../theme';
 
 /**
  * Lo que comparten las dos guías: la de canales (`LiveScreen`) y la de
@@ -85,8 +80,8 @@ export function GuideHeader({
           pointerEvents="none"
           style={[
             StyleSheet.absoluteFill,
-            guide.headerBack,
-            {opacity: headerOpacity},
+                        guide.headerBack,
+                        {opacity: headerOpacity},
           ]}
         />
 
@@ -203,6 +198,7 @@ export function Shot({
 }
 
 export const guide = StyleSheet.create({
+  headerBack: {backgroundColor: '#0f0f0f'},
   container: {flex: 1, backgroundColor: '#0f0f0f'},
   pressed: {opacity: 0.6},
   header: {
@@ -216,7 +212,6 @@ export const guide = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
   },
-  headerBack: {backgroundColor: '#0f0f0f'},
   appTitle: {color: '#fff', fontSize: 24, fontWeight: '800'},
   circle: {
     width: 40,
@@ -237,6 +232,7 @@ export const guide = StyleSheet.create({
     backgroundColor: '#0f0f0f',
   },
   input: {
+    fontFamily: FONT,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 12,

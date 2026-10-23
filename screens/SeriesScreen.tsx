@@ -1,16 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {
-  Animated,
-  BackHandler,
-  Image,
-  Modal,
-  Pressable,
-  Share,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import {Animated, BackHandler, Image, Modal, Pressable, Share, StyleSheet, useWindowDimensions, View} from 'react-native';
+import Text from '../components/Text';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import {
@@ -105,8 +95,11 @@ export default function SeriesScreen({
   // reproductor y devolvemos false para que le llegue a él (no basta con confiar
   // en el orden de registro: este efecto se vuelve a suscribir en cada render que
   // cambie `onBack`, y acabaría adelantándose al del reproductor).
+  // En el miniplayer no manda el reproductor: atrás es de esta pantalla.
   const immersive =
-    player.index !== null && player.presentation === 'immersive';
+    player.index !== null &&
+    player.presentation === 'immersive' &&
+    player.mode !== 'mini';
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (immersive) {

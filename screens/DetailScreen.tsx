@@ -1,16 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {
-  Animated,
-  BackHandler,
-  Linking,
-  Pressable,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import {Animated, BackHandler, Linking, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View} from 'react-native';
+import Text from '../components/Text';
 import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import SOURCES, {movies, useCatalog} from '../sources';
 import {t} from '../i18n';
@@ -102,7 +92,11 @@ export default function DetailScreen({
   // reproductor y devolvemos false para que le llegue a él (este efecto se vuelve
   // a suscribir en cada render que cambie `onBack`, así que no vale confiar en el
   // orden de registro).
-  const playing = player.index !== null && player.presentation === 'immersive';
+  // En el miniplayer no manda el reproductor: atrás es de esta pantalla.
+  const playing =
+    player.index !== null &&
+    player.presentation === 'immersive' &&
+    player.mode !== 'mini';
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (playing) {

@@ -1,14 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {
-  BackHandler,
-  FlatList,
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import {BackHandler, FlatList, Image, Pressable, StyleSheet, useWindowDimensions, View} from 'react-native';
+import Text from '../components/Text';
 import {
   allSeries,
   catalogState,
@@ -72,7 +64,11 @@ export default function CategoryScreen({
 
   // Atrás vuelve a Inicio, salvo con un vídeo abierto encima: entonces manda el
   // reproductor y le dejamos el gesto devolviendo false.
-  const playing = player.index !== null && player.presentation === 'immersive';
+  // En el miniplayer no manda el reproductor: atrás es de esta pantalla.
+  const playing =
+    player.index !== null &&
+    player.presentation === 'immersive' &&
+    player.mode !== 'mini';
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (playing) {

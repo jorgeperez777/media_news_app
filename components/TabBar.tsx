@@ -1,5 +1,6 @@
 import React, {useEffect, useRef} from 'react';
-import {Animated, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Animated, Pressable, StyleSheet, View} from 'react-native';
+import Text from './Text';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   FavoriteIcon,
@@ -53,7 +54,11 @@ export type TabKey =
 const TABS: Array<{
   key: TabKey;
   label: TextKey;
-  Icon: (props: {size?: number; color?: string}) => React.JSX.Element;
+  Icon: (props: {
+    size?: number;
+    color?: string;
+    filled?: boolean;
+  }) => React.JSX.Element;
 }> = [
   {key: 'inicio', label: 'tab.home', Icon: HomeIcon},
   {key: 'envivo', label: 'tab.live', Icon: LiveTvIcon},
@@ -125,7 +130,11 @@ function Tab({
   onPress,
 }: {
   label: string;
-  Icon: (props: {size?: number; color?: string}) => React.JSX.Element;
+  Icon: (props: {
+    size?: number;
+    color?: string;
+    filled?: boolean;
+  }) => React.JSX.Element;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -166,7 +175,12 @@ function Tab({
             },
           ],
         }}>
-        <Icon size={22} color={selected ? GRADIENT : INACTIVE} />
+        <Icon
+          size={22}
+          color={selected ? GRADIENT : INACTIVE}
+          // Como las apps de Google: línea en reposo, relleno la elegida.
+          filled={selected}
+        />
       </Animated.View>
       <Text
         numberOfLines={1}

@@ -1,13 +1,6 @@
 import React, {useState} from 'react';
-import {
-  Image,
-  PixelRatio,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import {Image, PixelRatio, Pressable, StyleSheet, View, type ViewStyle} from 'react-native';
+import Text from './Text';
 import {PlayIcon} from './icons';
 import {SCRIM} from './scrim';
 import {PROGRESS_GRADIENT} from '../theme';

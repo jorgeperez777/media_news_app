@@ -1,14 +1,6 @@
 import React, {useEffect, useState} from 'react';
-import {
-  Animated,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import {Animated, Image, Pressable, ScrollView, StyleSheet, useWindowDimensions, View} from 'react-native';
+import Text from '../components/Text';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {isLive, liveChannels, useCatalog} from '../sources';
 import {loadFavourites, toggleFavourite} from '../player/storage';
@@ -16,7 +8,11 @@ import {usePlayer} from '../player/PlayerContext';
 import {t} from '../i18n';
 import {MINI_HEIGHT} from '../components/PlayerHost';
 import {useTabBarSpace} from '../components/TabBar';
-import {ArrowBackIcon, FavoriteIcon, PipIcon} from '../components/icons';
+import {
+  ArrowBackIcon,
+  FavoriteIcon,
+  PipIcon,
+} from '../components/icons';
 import Skeleton from '../components/Skeleton';
 import {ACCENT, PROGRESS_GRADIENT} from '../theme';
 import {
@@ -161,7 +157,10 @@ export default function LiveScreen({
         }}
         // El índice 1 es el bloque de pestañas y categorías (el 0 es la tira
         // de «ahora», que sí se va con el desplazamiento).
-        stickyHeaderIndices={[1]}
+        // Sin canal sonando (una película en el miniplayer) esa tira no se
+        // pinta y las pestañas pasan a ser el 0; con el 1 fijo se quedaba
+        // pegada la primera fila de canales, descolocada.
+        stickyHeaderIndices={[current ? 1 : 0]}
         // Solo mueve opacidades: puede ir por el hilo nativo.
         onScroll={Animated.event(
           [{nativeEvent: {contentOffset: {y: scrollY}}}],
@@ -357,6 +356,22 @@ export default function LiveScreen({
           title={player.pip ? t('live.inPip') : t('live.inMini')}
           hint={t('live.backHere')}
           onPress={() => player.expand()}
+        />
+      )}
+      {/* Lo que suena es una película o un episodio (en el miniplayer): el
+          hueco no se queda en negro, ofrece volver a la tele. El canal no se
+          pone solo, que eso pararía lo que se está viendo sin pedirlo. */}
+      {player.index !== null && !isLive(player.index) && all.length > 0 && (
+        <StageCard
+          width={width}
+          height={videoHeight}
+          top={HEADER_HEIGHT + (searchOpen ? SEARCH_HEIGHT : 0)}
+          title={t('live.otherPlaying')}
+          hint={t('live.watchChannel', {
+            title: (all.find(channel => channel.index === last) ?? all[0])
+              .title,
+          })}
+          onPress={() => tune(last ?? all[0].index)}
         />
       )}
 

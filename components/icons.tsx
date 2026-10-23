@@ -1,12 +1,18 @@
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Platform, StyleSheet, View} from 'react-native';
+import Text from './Text';
 import Svg, {Defs, LinearGradient, Path, Stop} from 'react-native-svg';
 import {ACCENT, ACCENT_END} from '../theme';
 
-// Iconos vectoriales (react-native-svg) con la geometría de Material Symbols:
-// un único viewBox 24x24 para todos, así comparten grosor y peso óptico.
+// Iconos de línea (react-native-svg), al estilo de Netflix: contorno de trazo
+// uniforme con puntas redondas, en un único viewBox 24x24 para que todos pesen
+// igual. Son los mismos dibujos que los controles del reproductor
+// (`react-native-video/controls`), para que la app y el reproductor casen.
 
 const WHITE = '#fff';
+
+/** El fondo de la barra de pestañas: con él se calan las letras de «TV». */
+const TAB_BACKGROUND = '#141416';
 
 /**
  * Pasado como `color`, el icono se pinta con el **degradado** de la marca en vez
@@ -14,21 +20,39 @@ const WHITE = '#fff';
  */
 export const GRADIENT = 'gradient';
 
-type IconProps = {size?: number; color?: string};
+type IconProps = {
+  size?: number;
+  color?: string;
+  /**
+   * Relleno en vez de línea. Las pestañas lo usan para la elegida, como las
+   * apps de Google: línea en reposo, relleno al estar activa.
+   */
+  filled?: boolean;
+};
+
+/** Grosor de la línea, en unidades del viewBox de 24. */
+const STROKE = 1.8;
+
+/** Los rellenos llevan un trazo fino del mismo color que redondea esquinas. */
+const ROUND = 1.6;
 
 /** Envoltorio común: todos los paths están dibujados en una rejilla de 24x24. */
 function Icon({
   size,
   color = WHITE,
   path,
+  filled = false,
 }: {
   size: number;
   color?: string;
   path: string;
+  /** Relleno (play, pausa, el corazón…) en vez de línea. */
+  filled?: boolean;
 }) {
   // Un id por icono montado: dos degradados con el mismo id se pisan.
   const id = `i${React.useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const gradient = color === GRADIENT;
+  const paint = gradient ? `url(#${id})` : color;
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       {gradient ? (
@@ -39,78 +63,86 @@ function Icon({
           </LinearGradient>
         </Defs>
       ) : null}
-      <Path d={path} fill={gradient ? `url(#${id})` : color} />
+      <Path
+        d={path}
+        fill={filled ? paint : 'none'}
+        stroke={paint}
+        strokeWidth={filled ? ROUND : STROKE}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </Svg>
   );
 }
 
 const PATHS = {
-  play: 'M8 5v14l11-7z',
-  pause: 'M6 19h4V5H6v14zm8-14v14h4V5h-4z',
-  replay:
-    'M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z',
-  stop: 'M6 6h12v12H6z',
-  close:
-    'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
-  chevronDown: 'M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z',
-  fastForward: 'M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z',
-  skipNext: 'M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z',
-  add: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
-  check: 'M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z',
+  play: 'M7.5 4.8v14.4L19 12z',
+  pause: 'M7 5h2.8v14H7zM14.2 5H17v14h-2.8z',
+  // Flecha circular abierta, con la punta arriba hacia atrás (como el ⟲10 de
+  // Netflix). Su centro es (12, 13): ahí va el número en `SkipIcon`.
+  replay: 'M12 5a8 8 0 1 1-6.93 4M14.5 2.5 12 5l2.5 2.5',
+  stop: 'M6.5 6.5h11v11h-11z',
+  close: 'M6 6l12 12M18 6 6 18',
+  chevronDown: 'M6 9l6 6 6-6',
+  fastForward: 'M3.5 6.5v11l7.5-5.5zM12.5 6.5v11l7.5-5.5z',
+  skipNext: 'M5 5.5v13l10-6.5zM19 5.5v13',
+  add: 'M12 5v14M5 12h14',
+  check: 'M5 12.5l4.5 4.5L19 7.5',
   share:
-    'M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.8.43-.8.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z',
-  skipPrevious: 'M6 6h2v12H6zm3.5 6 8.5 6V6z',
-  fullscreen:
-    'M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z',
-  fullscreenExit:
-    'M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z',
+    'M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8.6 13.5l6.8 4M15.4 6.5l-6.8 4',
+  skipPrevious: 'M19 5.5v13L9 12zM5 5.5v13',
+  fullscreen: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5',
+  fullscreenExit: 'M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5',
   pictureInPicture:
-    'M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z',
+    'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM12.5 12h5v4h-5z',
+  // La pantalla, la ventanita del miniplayer abajo a la derecha y una flecha
+  // que va hacia ella: «mandar el vídeo a la miniatura». La flecha lo separa
+  // del de PiP, que es solo el recuadro.
+  miniPlayer:
+    'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM13.5 12.5H18V16h-4.5zM6.5 8l4.5 4.5M11 9v3.5H7.5',
+  // El engranaje de Material, pero solo su contorno: el trazo sigue la silueta
+  // exterior y el agujero del centro.
   settings:
-    'M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z',
-  cast: 'M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z',
+    'M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15A3 3 0 1 1 12 9a3 3 0 0 1 0 6z',
+  cast: 'M3 8V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-6M3 12a7 7 0 0 1 7 7M3 15.5A3.5 3.5 0 0 1 6.5 19M3 19h.01',
   castConnected:
-    'M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm18-7H5v1.63c3.96 1.28 7.09 4.41 8.37 8.37H19V7zM1 10v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z',
+    'M3 8V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-6M3 12a7 7 0 0 1 7 7M3 15.5A3.5 3.5 0 0 1 6.5 19M3 19h.01M7 8.5h10.5v7H14',
+  // Recuadro con dos «C» de arco abiertas.
   closedCaption:
-    'M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z',
+    'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM10.5 10.3a2.2 2.2 0 1 0 0 3.4M17 10.3a2.2 2.2 0 1 0 0 3.4',
   liveTv:
-    'M21 6h-7.59l3.29-3.29L16 2l-4 4-4-4-.71.71L10.59 6H3c-1.1 0-2 .89-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.11-.9-2-2-2zm0 14H3V8h18v12zM9 10v8l7-4-7-4z',
+    'M4 7h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zM8 2.5 12 7l4-4.5',
   videoLibrary:
-    'M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z',
-  search:
-    'M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z',
-  person:
-    'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
+    'M7 3h13a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H7zM3 7v13a1 1 0 0 0 1 1h13M12 7.5v5l4-2.5z',
+  search: 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM20 20l-4.8-4.8',
+  person: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20c0-3.3 3.6-5 8-5s8 1.7 8 5',
   airplay:
-    'M6 22h12l-6-6-6 6zM21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V5h18v12h-4v2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z',
-  arrowBack: 'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z',
-  lock: 'M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z',
+    'M7 17H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-3M12 15l4.5 5h-9z',
+  arrowBack: 'M20 12H4M10 6l-6 6 6 6',
+  lock: 'M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1zM8 11V7a4 4 0 0 1 8 0v4M12 15v2',
   lockOpen:
-    'M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h2c0-1.66 1.34-3 3-3s3 1.34 3 3v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z',
-  episodes: 'M4 6h12v2H4zm0 4h12v2H4zm0 4h8v2H4zm10 0v6l5-3z',
-  home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
-  news: 'M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H4V5h16v14zM6 7h7v6H6zm8 0h4v2h-4zm0 4h4v2h-4zM6 15h12v2H6z',
+    'M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1zM8 11V7a4 4 0 0 1 7.7-1.5M12 15v2',
+  episodes: 'M4 6h16M4 12h10M4 18h7M16 14.5v6l4.5-3z',
+  home: 'M4 10.5 12 4l8 6.5V20h-5v-6h-6v6H4z',
+  news: 'M4 4h16v16H4zM7 8h5v4H7zM14.5 8H17M14.5 11H17M7 15.5h10',
   favorite:
-    'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54z',
-  // Globo terráqueo para el idioma: el círculo y los husos, sin más detalle
-  // del que se ve a 22 dp.
-  // Aro, ecuador y meridiano. Cada hueco se dibuja en sentido contrario al
-  // trazo que lo rodea: así el relleno por defecto (nonzero) los deja vacíos
-  // en vez de pintar un disco macizo.
+    'M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.2 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z',
+  // Globo del idioma: el aro, el ecuador y el meridiano.
   language:
-    'M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20zM12 4a8 8 0 1 1 0 16a8 8 0 1 1 0-16zM4.5 10.6h15v2.8h-15zM12 2.5c2.2 0 4 4.3 4 9.5s-1.8 9.5-4 9.5-4-4.3-4-9.5 1.8-9.5 4-9.5zM12 4.5c-1.1 0-2 3.4-2 7.5s.9 7.5 2 7.5 2-3.4 2-7.5-.9-7.5-2-7.5z',
+    'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3z',
   // Barras de cobertura: el ahorro de datos va de cuánta red se gasta.
-  signal: 'M3 17h3v4H3v-4zm5.5-5h3v9h-3v-9zM14 7h3v14h-3V7zm5.5-5h3v19h-3V2z',
+  signal: 'M5 20v-3M10 20v-7M15 20V9M20 20V4',
   delete:
-    'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
+    'M4 7h16M10 3.5h4M6.5 7l.8 12a1 1 0 0 0 1 1h7.4a1 1 0 0 0 1-1l.8-12M10 11v5M14 11v5',
 };
 
+
 export function PlayIcon({size = 36, color}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.play} />;
+  return <Icon size={size} color={color} path={PATHS.play} filled />;
 }
 
 export function PauseIcon({size = 36, color}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.pause} />;
+  return <Icon size={size} color={color} path={PATHS.pause} filled />;
 }
 
 export function ReplayIcon({size = 36, color}: IconProps) {
@@ -118,7 +150,7 @@ export function ReplayIcon({size = 36, color}: IconProps) {
 }
 
 export function StopIcon({size = 22, color}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.stop} />;
+  return <Icon size={size} color={color} path={PATHS.stop} filled />;
 }
 
 export function CloseIcon({size = 22, color}: IconProps) {
@@ -147,6 +179,7 @@ export function TrackIcon({
       size={size}
       color={color}
       path={direction === 'next' ? PATHS.skipNext : PATHS.skipPrevious}
+      filled
     />
   );
 }
@@ -166,7 +199,7 @@ export function FullscreenIcon({
 }
 
 export function FastForwardIcon({size = 24, color}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.fastForward} />;
+  return <Icon size={size} color={color} path={PATHS.fastForward} filled />;
 }
 
 export function PipIcon({size = 24, color}: IconProps) {
@@ -238,20 +271,36 @@ export function CheckIcon({size = 22, color}: IconProps) {
   return <Icon size={size} color={color} path={PATHS.check} />;
 }
 
+/**
+ * Compartir con el dibujo de cada sistema: en iOS el cuadrado con la flecha
+ * hacia arriba, que es el de su hoja de compartir; en Android los tres nodos.
+ */
+const SHARE_IOS =
+  'M12 3v12M8 7l4-4 4 4M8.5 10H6.5a1 1 0 0 0-1 1v8.5a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V11a1 1 0 0 0-1-1h-2';
+
 export function ShareIcon({size = 22, color}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.share} />;
+  return (
+    <Icon
+      size={size}
+      color={color}
+      path={Platform.OS === 'ios' ? SHARE_IOS : PATHS.share}
+    />
+  );
 }
 
-export function HomeIcon({size = 22, color}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.home} />;
+export function HomeIcon({size = 22, color, filled}: IconProps) {
+  return <Icon size={size} color={color} path={PATHS.home} filled={filled} />;
 }
 
 export function NewsIcon({size = 22, color}: IconProps) {
   return <Icon size={size} color={color} path={PATHS.news} />;
 }
 
-export function FavoriteIcon({size = 22, color}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.favorite} />;
+/** Relleno por defecto (un corazón marcado); la pestaña lo pide en línea. */
+export function FavoriteIcon({size = 22, color, filled = true}: IconProps) {
+  return (
+    <Icon size={size} color={color} path={PATHS.favorite} filled={filled} />
+  );
 }
 
 /**
@@ -262,7 +311,7 @@ export function FavoriteIcon({size = 22, color}: IconProps) {
  * trazos, y el degradado de la marca (ver `GRADIENT`) tiene que pintar también
  * el `stroke`, no solo el relleno.
  */
-export function LiveTvIcon({size = 22, color}: IconProps) {
+export function LiveTvIcon({size = 22, color, filled}: IconProps) {
   const id = `tv${React.useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const gradient = color === GRADIENT;
   const paint = gradient ? `url(#${id})` : color ?? WHITE;
@@ -276,19 +325,24 @@ export function LiveTvIcon({size = 22, color}: IconProps) {
           </LinearGradient>
         </Defs>
       ) : null}
-      {/* La pantalla, abierta por abajo para que entre el ángulo. */}
+      {/* La pantalla, abierta por abajo para que entre el ángulo. Rellena
+          (activa), es una pantalla entera con las letras caladas. */}
       <Path
-        d="M8 15.5H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v6.5a3 3 0 0 1-3 3h-2"
-        fill="none"
+        d={
+          filled
+            ? 'M6 3h12a3 3 0 0 1 3 3v6.5a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z'
+            : 'M8 15.5H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v6.5a3 3 0 0 1-3 3h-2'
+        }
+        fill={filled ? paint : 'none'}
         stroke={paint}
         strokeWidth={2}
         strokeLinecap="round"
       />
-      {/* «TV» dentro. */}
+      {/* «TV» dentro: calada en el color de la barra si va rellena. */}
       <Path
         d="M6.8 6.4h4.6M9.1 6.4v5.4M12.9 6.4l2.2 5.4 2.2-5.4"
         fill="none"
-        stroke={paint}
+        stroke={filled ? TAB_BACKGROUND : paint}
         strokeWidth={1.9}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -314,8 +368,8 @@ export function SearchIcon({size = 22, color}: IconProps) {
   return <Icon size={size} color={color} path={PATHS.search} />;
 }
 
-export function PersonIcon({size = 22, color}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.person} />;
+export function PersonIcon({size = 22, color, filled}: IconProps) {
+  return <Icon size={size} color={color} path={PATHS.person} filled={filled} />;
 }
 
 export function LanguageIcon({size = 22, color}: IconProps) {
@@ -365,6 +419,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     // El arco de Material no está centrado en el viewBox: el número baja un poco
     // para quedar dentro de la circunferencia.
-    marginTop: '5%',
+    marginTop: '8%',
   },
 });

@@ -1,13 +1,6 @@
 import React, {useState} from 'react';
-import {
-  LayoutAnimation,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type StyleProp,
-  type TextStyle,
-} from 'react-native';
+import {LayoutAnimation, Pressable, StyleSheet, View, type StyleProp, type TextStyle} from 'react-native';
+import Text from './Text';
 import {t} from '../i18n';
 import {ENTER_MS, useReduceMotion} from './motion';
 
