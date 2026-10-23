@@ -176,7 +176,7 @@ function Tab({
           ],
         }}>
         <Icon
-          size={22}
+          size={24}
           color={selected ? GRADIENT : INACTIVE}
           // Como las apps de Google: línea en reposo, relleno la elegida.
           filled={selected}
@@ -209,7 +209,8 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255,255,255,0.12)',
   },
   tab: {flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3},
-  label: {color: INACTIVE, fontSize: 10, fontWeight: '600'},
+  // Como Pluto: etiqueta en negrita y un poco abierta.
+  label: {color: INACTIVE, fontSize: 11, fontWeight: '700', letterSpacing: 0.4},
   labelOn: {color: ACTIVE},
   pressed: {opacity: 0.6},
 });

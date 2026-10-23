@@ -19,7 +19,7 @@ const es = {
   'live.badge': 'EN VIVO',
 
   // Capítulos y continuidad
-  'next.nextEpisode': 'Siguiente episodio',
+  'next.badge': 'T{season} E{number}',
 
   // Accesibilidad
   'a11y.back10': 'Retrocede 10 segundos',
@@ -192,7 +192,7 @@ const es = {
 
 const en: Record<keyof typeof es, string> = {
   'live.badge': 'LIVE',
-  'next.nextEpisode': 'Next episode',
+  'next.badge': 'S{season} E{number}',
   'a11y.back10': 'Goes back 10 seconds',
 
   'tab.home': 'Home',

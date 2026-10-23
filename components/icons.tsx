@@ -4,15 +4,13 @@ import Text from './Text';
 import Svg, {Defs, LinearGradient, Path, Stop} from 'react-native-svg';
 import {ACCENT, ACCENT_END} from '../theme';
 
-// Iconos de línea (react-native-svg), al estilo de Netflix: contorno de trazo
-// uniforme con puntas redondas, en un único viewBox 24x24 para que todos pesen
-// igual. Son los mismos dibujos que los controles del reproductor
+// Iconos de línea (react-native-svg), al estilo de Pluto TV: trazo grueso y
+// uniforme, esquinas a escuadra y puntas redondas, en un único viewBox 24x24
+// para que todos pesen igual. Son los mismos dibujos que los controles del reproductor
 // (`react-native-video/controls`), para que la app y el reproductor casen.
 
 const WHITE = '#fff';
 
-/** El fondo de la barra de pestañas: con él se calan las letras de «TV». */
-const TAB_BACKGROUND = '#141416';
 
 /**
  * Pasado como `color`, el icono se pinta con el **degradado** de la marca en vez
@@ -31,10 +29,10 @@ type IconProps = {
 };
 
 /** Grosor de la línea, en unidades del viewBox de 24. */
-const STROKE = 1.8;
+const STROKE = 2.4;
 
 /** Los rellenos llevan un trazo fino del mismo color que redondea esquinas. */
-const ROUND = 1.6;
+const ROUND = 1.8;
 
 /** Envoltorio común: todos los paths están dibujados en una rejilla de 24x24. */
 function Icon({
@@ -42,12 +40,21 @@ function Icon({
   color = WHITE,
   path,
   filled = false,
+  solid,
+  width = STROKE,
+  cap = 'round',
 }: {
   size: number;
   color?: string;
   path: string;
   /** Relleno (play, pausa, el corazón…) en vez de línea. */
   filled?: boolean;
+  /** Un trazo macizo aparte (el punto de la señal, la persona, la punta…). */
+  solid?: string;
+  /** Grosor distinto del normal, para los iconos de línea fina. */
+  width?: number;
+  /** Puntas rectas (las esquinas de pantalla completa). */
+  cap?: 'round' | 'butt';
 }) {
   // Un id por icono montado: dos degradados con el mismo id se pisan.
   const id = `i${React.useId().replace(/[^a-zA-Z0-9]/g, '')}`;
@@ -67,10 +74,11 @@ function Icon({
         d={path}
         fill={filled ? paint : 'none'}
         stroke={paint}
-        strokeWidth={filled ? ROUND : STROKE}
-        strokeLinejoin="round"
-        strokeLinecap="round"
+        strokeWidth={filled ? ROUND : width}
+        strokeLinejoin="miter"
+        strokeLinecap={cap}
       />
+      {solid ? <Path d={solid} fill={paint} /> : null}
     </Svg>
   );
 }
@@ -80,7 +88,10 @@ const PATHS = {
   pause: 'M7 5h2.8v14H7zM14.2 5H17v14h-2.8z',
   // Flecha circular abierta, con la punta arriba hacia atrás (como el ⟲10 de
   // Netflix). Su centro es (12, 13): ahí va el número en `SkipIcon`.
-  replay: 'M12 5a8 8 0 1 1-6.93 4M14.5 2.5 12 5l2.5 2.5',
+  // El «reiniciar» de Pluto: tres cuartos de círculo con la punta maciza arriba
+  // a la izquierda. Su centro es (12, 13.2): ahí va el número en `SkipIcon`.
+  replay: 'M3.5 13.2a8.5 8.5 0 1 0 8.5-8.5',
+  replaySolid: 'M13.9 1.7v7.1L7.4 5.3z',
   stop: 'M6.5 6.5h11v11h-11z',
   close: 'M6 6l12 12M18 6 6 18',
   chevronDown: 'M6 9l6 6 6-6',
@@ -91,15 +102,19 @@ const PATHS = {
   share:
     'M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8.6 13.5l6.8 4M15.4 6.5l-6.8 4',
   skipPrevious: 'M19 5.5v13L9 12zM5 5.5v13',
-  fullscreen: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5',
+  // Las cuatro esquinas de Pluto: brazos largos y puntas rectas.
+  fullscreen: 'M3 9.5V3h6.5M14.5 3H21v6.5M21 14.5V21h-6.5M9.5 21H3v-6.5',
   fullscreenExit: 'M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5',
-  pictureInPicture:
-    'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM12.5 12h5v4h-5z',
+  // PiP del sistema: el recuadro con la ventanita maciza, para no confundirlo
+  // con el miniplayer (que la lleva en línea).
+  pictureInPicture: 'M1.1 3.5h21.8v17H1.1z',
+  pictureInPictureSolid: 'M11.1 10.9h8.8v7h-8.8z',
   // La pantalla, la ventanita del miniplayer abajo a la derecha y una flecha
   // que va hacia ella: «mandar el vídeo a la miniatura». La flecha lo separa
   // del de PiP, que es solo el recuadro.
-  miniPlayer:
-    'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM13.5 12.5H18V16h-4.5zM6.5 8l4.5 4.5M11 9v3.5H7.5',
+  // El miniplayer de Pluto, calcado de su botón: el recuadro y la ventanita
+  // abajo a la derecha, los dos en línea fina.
+  miniPlayer: 'M1.1 3.5h21.8v17H1.1zM12 11.8h7v5.2h-7z',
   // El engranaje de Material, pero solo su contorno: el trazo sigue la silueta
   // exterior y el agujero del centro.
   settings:
@@ -110,23 +125,34 @@ const PATHS = {
   // Recuadro con dos «C» de arco abiertas.
   closedCaption:
     'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM10.5 10.3a2.2 2.2 0 1 0 0 3.4M17 10.3a2.2 2.2 0 1 0 0 3.4',
+  // La señal «((•))» de Pluto: dos arcos a cada lado y el punto macizo.
   liveTv:
-    'M4 7h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zM8 2.5 12 7l4-4.5',
+    'M7 8.25a6.6 6.6 0 0 0 0 9.35M17 8.25a6.6 6.6 0 0 1 0 9.35M3.2 5.8a11 11 0 0 0 0 14.3M20.8 5.8a11 11 0 0 1 0 14.3',
+  liveTvSolid: 'M12 16.36a3.44 3.44 0 1 0 0-6.88 3.44 3.44 0 0 0 0 6.88z',
   videoLibrary:
     'M7 3h13a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H7zM3 7v13a1 1 0 0 0 1 1h13M12 7.5v5l4-2.5z',
-  search: 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM20 20l-4.8-4.8',
-  person: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20c0-3.3 3.6-5 8-5s8 1.7 8 5',
+  search: 'M9.1 16.95a7.85 7.85 0 1 0 0-15.7 7.85 7.85 0 0 0 0 15.7zM14.9 14.9l7.85 7.85',
+  // La persona dentro del círculo, como el «Sign In» de Pluto: el aro en
+  // línea y la persona maciza (ver `personSolid`).
+  person: 'M12 22.75a10.75 10.75 0 1 0 0-21.5 10.75 10.75 0 0 0 0 21.5z',
+  personSolid:
+    'M12 12.12a3.56 3.56 0 1 0 0-7.12 3.56 3.56 0 0 0 0 7.12zM5.12 18.54c1.16-2.66 3.8-4.52 6.88-4.52s5.72 1.86 6.88 4.52A9.5 9.5 0 0 1 12 21.5a9.5 9.5 0 0 1-6.88-2.96z',
   airplay:
     'M7 17H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-3M12 15l4.5 5h-9z',
   arrowBack: 'M20 12H4M10 6l-6 6 6 6',
-  lock: 'M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1zM8 11V7a4 4 0 0 1 8 0v4M12 15v2',
-  lockOpen:
-    'M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1zM8 11V7a4 4 0 0 1 7.7-1.5M12 15v2',
+  // El candado de Pluto: cuerpo macizo y arco fino.
+  lock: 'M6.75 10V8a5.25 5.25 0 0 1 10.5 0v2',
+  lockSolid: 'M5 10h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1z',
+  lockOpen: 'M6.75 10V8a5.25 5.25 0 0 1 10.1-2',
   episodes: 'M4 6h16M4 12h10M4 18h7M16 14.5v6l4.5-3z',
-  home: 'M4 10.5 12 4l8 6.5V20h-5v-6h-6v6H4z',
+  // La casa de Pluto: tejado a dos aguas y la puerta como muesca en la base
+  // (rellena, es una silueta maciza con la puerta vacía).
+  home: 'M2.7 8.7 12 1.3l9.3 7.4v13.6h-5.5v-7.9a1.7 1.7 0 0 0-1.7-1.7h-4.2a1.7 1.7 0 0 0-1.7 1.7v7.9H2.7z',
+  homeSolid: 'M1.45 8.7 12 0l10.55 8.7V24h-7.9v-8.6H9.35V24h-7.9z',
   news: 'M4 4h16v16H4zM7 8h5v4H7zM14.5 8H17M14.5 11H17M7 15.5h10',
+  // El corazón de Pluto, por el centro de su contorno.
   favorite:
-    'M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.2 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z',
+    'M12 6.9C11 5.6 9.5 5 8 5 5.7 5 4 6.8 4 9c0 3 2.8 5.6 7.4 9.7l.6.5.6-.5C17.2 14.6 20 12 20 9c0-2.2-1.7-4-4-4-1.5 0-3 .6-4 1.9z',
   // Globo del idioma: el aro, el ecuador y el meridiano.
   language:
     'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3z',
@@ -146,7 +172,15 @@ export function PauseIcon({size = 36, color}: IconProps) {
 }
 
 export function ReplayIcon({size = 36, color}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.replay} />;
+  return (
+    <Icon
+      size={size}
+      color={color}
+      path={PATHS.replay}
+      solid={PATHS.replaySolid}
+      width={1.7}
+    />
+  );
 }
 
 export function StopIcon({size = 22, color}: IconProps) {
@@ -194,6 +228,7 @@ export function FullscreenIcon({
       size={size}
       color={color}
       path={exit ? PATHS.fullscreenExit : PATHS.fullscreen}
+      cap="butt"
     />
   );
 }
@@ -203,7 +238,22 @@ export function FastForwardIcon({size = 24, color}: IconProps) {
 }
 
 export function PipIcon({size = 24, color}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.pictureInPicture} />;
+  return (
+    <Icon
+      size={size}
+      color={color}
+      path={PATHS.pictureInPicture}
+      solid={PATHS.pictureInPictureSolid}
+      width={1.75}
+    />
+  );
+}
+
+/** El miniplayer de Pluto: el recuadro con la ventanita en línea. */
+export function MiniPlayerIcon({size = 24, color}: IconProps) {
+  return (
+    <Icon size={size} color={color} path={PATHS.miniPlayer} width={1.75} />
+  );
 }
 
 export function SettingsIcon({size = 24, color}: IconProps) {
@@ -235,7 +285,13 @@ export function LockIcon({
   color,
 }: IconProps & {open?: boolean}) {
   return (
-    <Icon size={size} color={color} path={open ? PATHS.lockOpen : PATHS.lock} />
+    <Icon
+      size={size}
+      color={color}
+      path={open ? PATHS.lockOpen : PATHS.lock}
+      solid={PATHS.lockSolid}
+      width={1.5}
+    />
   );
 }
 
@@ -288,8 +344,16 @@ export function ShareIcon({size = 22, color}: IconProps) {
   );
 }
 
+/** Elegida, la silueta maciza de Pluto; en reposo, el contorno. */
 export function HomeIcon({size = 22, color, filled}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.home} filled={filled} />;
+  return (
+    <Icon
+      size={size}
+      color={color}
+      path={filled ? PATHS.homeSolid : PATHS.home}
+      filled={filled}
+    />
+  );
 }
 
 export function NewsIcon({size = 22, color}: IconProps) {
@@ -299,64 +363,26 @@ export function NewsIcon({size = 22, color}: IconProps) {
 /** Relleno por defecto (un corazón marcado); la pestaña lo pide en línea. */
 export function FavoriteIcon({size = 22, color, filled = true}: IconProps) {
   return (
-    <Icon size={size} color={color} path={PATHS.favorite} filled={filled} />
+    <Icon
+      size={size}
+      color={color}
+      path={PATHS.favorite}
+      filled={filled}
+      width={2}
+    />
   );
 }
 
-/**
- * La pestaña de TV en vivo: la pantalla con las letras «TV» y el ángulo
- * debajo, como el icono de las apps de televisión.
- *
- * No sale de Material Symbols, así que no puede usar `Icon`: se dibuja con
- * trazos, y el degradado de la marca (ver `GRADIENT`) tiene que pintar también
- * el `stroke`, no solo el relleno.
- */
-export function LiveTvIcon({size = 22, color, filled}: IconProps) {
-  const id = `tv${React.useId().replace(/[^a-zA-Z0-9]/g, '')}`;
-  const gradient = color === GRADIENT;
-  const paint = gradient ? `url(#${id})` : color ?? WHITE;
+/** La señal «((•))» de Pluto: los arcos en línea y el punto macizo. */
+export function LiveTvIcon({size = 22, color}: IconProps) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      {gradient ? (
-        <Defs>
-          <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor={ACCENT} />
-            <Stop offset="1" stopColor={ACCENT_END} />
-          </LinearGradient>
-        </Defs>
-      ) : null}
-      {/* La pantalla, abierta por abajo para que entre el ángulo. Rellena
-          (activa), es una pantalla entera con las letras caladas. */}
-      <Path
-        d={
-          filled
-            ? 'M6 3h12a3 3 0 0 1 3 3v6.5a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z'
-            : 'M8 15.5H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v6.5a3 3 0 0 1-3 3h-2'
-        }
-        fill={filled ? paint : 'none'}
-        stroke={paint}
-        strokeWidth={2}
-        strokeLinecap="round"
-      />
-      {/* «TV» dentro: calada en el color de la barra si va rellena. */}
-      <Path
-        d="M6.8 6.4h4.6M9.1 6.4v5.4M12.9 6.4l2.2 5.4 2.2-5.4"
-        fill="none"
-        stroke={filled ? TAB_BACKGROUND : paint}
-        strokeWidth={1.9}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* El ángulo, apoyado en el hueco de abajo. */}
-      <Path
-        d="M7.5 19.8 12 14.9l4.5 4.9"
-        fill="none"
-        stroke={paint}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
+    <Icon
+      size={size}
+      color={color}
+      path={PATHS.liveTv}
+      solid={PATHS.liveTvSolid}
+      width={2}
+    />
   );
 }
 
@@ -365,11 +391,20 @@ export function VideoLibraryIcon({size = 22, color}: IconProps) {
 }
 
 export function SearchIcon({size = 22, color}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.search} />;
+  return <Icon size={size} color={color} path={PATHS.search} width={2.5} />;
 }
 
-export function PersonIcon({size = 22, color, filled}: IconProps) {
-  return <Icon size={size} color={color} path={PATHS.person} filled={filled} />;
+/** El aro en línea y la persona maciza, elegida o no (como en Pluto). */
+export function PersonIcon({size = 22, color}: IconProps) {
+  return (
+    <Icon
+      size={size}
+      color={color}
+      path={PATHS.person}
+      solid={PATHS.personSolid}
+      width={2.5}
+    />
+  );
 }
 
 export function LanguageIcon({size = 22, color}: IconProps) {
@@ -397,7 +432,13 @@ export function SkipIcon({
   return (
     <View style={[styles.skip, {width: size, height: size}]}>
       <View style={direction === 'forward' ? styles.flipHorizontal : undefined}>
-        <Icon size={size} color={color} path={PATHS.replay} />
+        <Icon
+          size={size}
+          color={color}
+          path={PATHS.replay}
+          solid={PATHS.replaySolid}
+          width={1.7}
+        />
       </View>
       <Text
         style={[

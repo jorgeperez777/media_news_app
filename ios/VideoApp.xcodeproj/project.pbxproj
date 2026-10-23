@@ -9,6 +9,11 @@
 /* Begin PBXBuildFile section */
 		0C80B921A6F3F58F76C31292 /* libPods-VideoApp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-VideoApp.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		F16A7BEE0000000000000000 /* Figtree-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F16A7BEF0000000000000000 /* Figtree-Regular.ttf */; };
+		F16A7BEE0000000000000001 /* Figtree-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F16A7BEF0000000000000001 /* Figtree-Medium.ttf */; };
+		F16A7BEE0000000000000002 /* Figtree-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F16A7BEF0000000000000002 /* Figtree-SemiBold.ttf */; };
+		F16A7BEE0000000000000003 /* Figtree-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F16A7BEF0000000000000003 /* Figtree-Bold.ttf */; };
+		F16A7BEE0000000000000004 /* Figtree-ExtraBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F16A7BEF0000000000000004 /* Figtree-ExtraBold.ttf */; };
 		45B3CAF905800264FBA4632C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
@@ -16,6 +21,11 @@
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* VideoApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VideoApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F16A7BEF0000000000000000 /* Figtree-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Figtree-Regular.ttf"; path = "VideoApp/Fonts/Figtree-Regular.ttf"; sourceTree = "<group>"; };
+		F16A7BEF0000000000000001 /* Figtree-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Figtree-Medium.ttf"; path = "VideoApp/Fonts/Figtree-Medium.ttf"; sourceTree = "<group>"; };
+		F16A7BEF0000000000000002 /* Figtree-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Figtree-SemiBold.ttf"; path = "VideoApp/Fonts/Figtree-SemiBold.ttf"; sourceTree = "<group>"; };
+		F16A7BEF0000000000000003 /* Figtree-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Figtree-Bold.ttf"; path = "VideoApp/Fonts/Figtree-Bold.ttf"; sourceTree = "<group>"; };
+		F16A7BEF0000000000000004 /* Figtree-ExtraBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Figtree-ExtraBold.ttf"; path = "VideoApp/Fonts/Figtree-ExtraBold.ttf"; sourceTree = "<group>"; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = VideoApp/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = VideoApp/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = VideoApp/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -43,6 +53,11 @@
 			isa = PBXGroup;
 			children = (
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
+				F16A7BEF0000000000000000 /* Figtree-Regular.ttf */,
+				F16A7BEF0000000000000001 /* Figtree-Medium.ttf */,
+				F16A7BEF0000000000000002 /* Figtree-SemiBold.ttf */,
+				F16A7BEF0000000000000003 /* Figtree-Bold.ttf */,
+				F16A7BEF0000000000000004 /* Figtree-ExtraBold.ttf */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
@@ -160,6 +175,11 @@
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
+				F16A7BEE0000000000000000 /* Figtree-Regular.ttf in Resources */,
+				F16A7BEE0000000000000001 /* Figtree-Medium.ttf in Resources */,
+				F16A7BEE0000000000000002 /* Figtree-SemiBold.ttf in Resources */,
+				F16A7BEE0000000000000003 /* Figtree-Bold.ttf in Resources */,
+				F16A7BEE0000000000000004 /* Figtree-ExtraBold.ttf in Resources */,
 				45B3CAF905800264FBA4632C /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

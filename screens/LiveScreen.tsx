@@ -11,7 +11,7 @@ import {useTabBarSpace} from '../components/TabBar';
 import {
   ArrowBackIcon,
   FavoriteIcon,
-  PipIcon,
+  MiniPlayerIcon,
 } from '../components/icons';
 import Skeleton from '../components/Skeleton';
 import {ACCENT, PROGRESS_GRADIENT} from '../theme';
@@ -419,7 +419,7 @@ function StageCard({
       ]}>
       {/* Sin el canal escrito aquí: va justo debajo, en la tira de «ahora». */}
       <View style={styles.stageMiddle}>
-        <PipIcon size={64} color="rgba(255,255,255,0.65)" />
+        <MiniPlayerIcon size={64} color="rgba(255,255,255,0.65)" />
         <Text style={styles.stageTitle}>{title}</Text>
         <Text style={styles.stageHint}>{hint}</Text>
       </View>

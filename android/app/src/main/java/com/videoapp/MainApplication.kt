@@ -25,9 +25,9 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     loadReactNative(this)
-    // Inter con sus pesos (res/font/inter.xml): `fontFamily: 'Inter'` en JS, y
-    // `fontWeight` elige el archivo. En iOS se queda la del sistema (SF Pro).
-    ReactFontManager.getInstance().addCustomFont(this, "Inter", R.font.inter)
+    // Figtree con sus pesos (res/font/figtree.xml): `fontFamily: 'Figtree'` en
+    // JS, y `fontWeight` elige el archivo. En iOS va en el bundle (UIAppFonts).
+    ReactFontManager.getInstance().addCustomFont(this, "Figtree", R.font.figtree)
     // react-native-orientation-locker: necesario para lockToLandscape/Portrait.
     registerActivityLifecycleCallbacks(OrientationActivityLifecycle.getInstance())
   }

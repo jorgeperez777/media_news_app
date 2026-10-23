@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {BackHandler, PermissionsAndroid, Platform, Pressable, StyleSheet, useWindowDimensions, View} from 'react-native';
+import {BackHandler, Image, PermissionsAndroid, Platform, Pressable, StyleSheet, useWindowDimensions, View} from 'react-native';
 import Text from './Text';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Orientation from 'react-native-orientation-locker';
@@ -214,6 +214,18 @@ function PlayerHost() {
   // teclado abierto (buscar), justo encima del teclado. Si no, al escribir se
   // queda debajo y parece que el vídeo se ha cerrado.
   const keyboard = useKeyboard(windowHeight);
+
+  // Barra de progreso del miniplayer (solo películas y episodios). El
+  // reproductor avisa cada segundo; se guarda en un ref y solo pasa a estado
+  // —y repinta— mientras el mini está a la vista.
+  const progressRef = useRef(0);
+  const [miniProgress, setMiniProgress] = useState(0);
+  const isMini = mode === 'mini';
+  useEffect(() => {
+    if (isMini) {
+      setMiniProgress(progressRef.current);
+    }
+  }, [isMini]);
   const mini = useMemo(
     () => ({
       x: 0,
@@ -240,7 +252,6 @@ function PlayerHost() {
   }
   const sourceUri =
     'uri' in current.source ? (current.source as {uri: string}).uri : undefined;
-  const isMini = mode === 'mini';
   const box = isMini ? mini : full;
 
   // En pantalla completa (o PiP, o inmersivo) el reproductor se dibuja él mismo a
@@ -337,6 +348,13 @@ function PlayerHost() {
             startPosition={
               player.fromStart ? 0 : resumeFrom(positions, sourceUri)
             }
+            onProgressChange={(seconds, duration) => {
+              const ratio = Math.min(1, Math.max(0, seconds / duration));
+              progressRef.current = ratio;
+              if (isMini) {
+                setMiniProgress(ratio);
+              }
+            }}
             onPositionChange={(seconds, duration) => {
               if (!sourceUri) {
                 return;
@@ -409,6 +427,18 @@ function PlayerHost() {
         />
       )}
 
+      {/* Progreso del vídeo a lo largo del mini, como en YouTube. Un directo no
+          tiene principio ni fin, así que ahí no hay barra. */}
+      {isMini && current.kind !== 'live' && (
+        <View pointerEvents="none" style={styles.miniTrack}>
+          <Image
+            source={{uri: PROGRESS_GRADIENT}}
+            resizeMode="stretch"
+            style={[styles.miniTrackFill, {width: `${miniProgress * 100}%`}]}
+          />
+        </View>
+      )}
+
       {/* Controles del miniplayer (solo existen en modo mini). */}
       {isMini && (
         <View style={styles.miniControls}>
@@ -446,16 +476,18 @@ function PlayerHost() {
 
 /** La tarjeta de «a continuación»: lo que el reproductor enseña del siguiente. */
 function nextCard(item: (typeof SOURCES)[number], inSeries: boolean) {
+  // En una serie manda el nombre de la serie, y el episodio va debajo con su
+  // «T1 E2»; una película suelta solo lleva su título.
+  const episode = inSeries && item.episode ? item.episode : undefined;
   return {
-    title: item.title,
-    label: inSeries ? t('next.nextEpisode') : undefined,
-    image: item.poster,
-    subtitle: item.episode
-      ? t('screen.seriesBadge', {
-          season: item.episode.season,
-          number: item.episode.number,
-        })
+    title: episode ? item.series?.title ?? item.title : item.title,
+    // Sin fotograma propio vale el fondo de la serie (apaisado, como la
+    // miniatura) y, si no, su cartel.
+    image: item.poster ?? item.series?.backdrop ?? item.series?.poster,
+    badge: episode
+      ? t('next.badge', {season: episode.season, number: episode.number})
       : undefined,
+    subtitle: episode ? item.title : undefined,
   };
 }
 
@@ -508,6 +540,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   miniTap: {position: 'absolute', left: 0, top: 0, bottom: 0},
+  miniTrack: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  miniTrackFill: {height: '100%'},
   miniControls: {
     flex: 1,
     flexDirection: 'row',
